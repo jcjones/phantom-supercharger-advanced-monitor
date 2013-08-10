@@ -3,7 +3,7 @@
 #include <Wire.h>
 #include <Adafruit_SSD1306.h>
 #include <Adafruit_GFX.h>
-//#include <SD.h>
+#include <SD.h>
 #include <RTClib.h>
 
 /*
@@ -31,12 +31,12 @@ from pins_arduino.h:
 #else
 
 /* Solo use */
-#define OLED_DC 11
-#define OLED_CS 12
-#define OLED_CLK 10
-#define OLED_MOSI 9
-#define OLED_RESET 13
-
+/*#define OLED_DC 11
+ #define OLED_CS 12
+ #define OLED_CLK 10
+ #define OLED_MOSI 9
+ #define OLED_RESET 13
+ */
 #endif
 
 #define VOLT_ONE A1
@@ -44,7 +44,7 @@ from pins_arduino.h:
 #define TEMP_TWO A3
 
 Adafruit_SSD1306 display(OLED_MOSI, OLED_CLK, OLED_DC, OLED_RESET, OLED_CS);
-//RTC_Millis rtc;
+RTC_DS1307 RTC;
 
 #if (SSD1306_LCDHEIGHT != 64)
 #error("Height incorrect, please fix Adafruit_SSD1306.h!");
@@ -74,10 +74,10 @@ void readVoltSensors()
 {  
   analogRead(VOLT_ONE); // Discard the first read
   sensorVoltOneI = analogRead(VOLT_ONE);
-  
+
   // fake it
   sensorVoltOneI = (millis()/10)%1023; // fake fake TODO
-  
+
   sensorVoltOne = sensorVoltOneI * (28.0 / 1024.0);
 
   addBarGraphDataPoint(sensorVoltOneI);
@@ -85,11 +85,37 @@ void readVoltSensors()
 
 void setup()
 {
-  barGraphIndex = 0;
-  memset(barGraphData, 0, sizeof(barGraphData));
-  
   // Open serial communications and wait for port to open:
   Serial.begin(9600);
+  
+  Wire.begin();
+  RTC.begin();
+
+  if (! RTC.isrunning()) {
+    Serial.println("RTC is NOT running!");
+    // following line sets the RTC to the date & time this sketch was compiled
+    // uncomment it & upload to set the time, date and start run the RTC!
+//    RTC.adjust(DateTime(__DATE__, __TIME__));
+  } 
+  else {
+    DateTime now = RTC.now();
+    Serial.print("RTC operating acceptably. Date is ");
+    Serial.print(now.year(), DEC);
+    Serial.print('/');
+    Serial.print(now.month(), DEC);
+    Serial.print('/');
+    Serial.print(now.day(), DEC);
+    Serial.print(' ');
+    Serial.print(now.hour(), DEC);
+    Serial.print(':');
+    Serial.print(now.minute(), DEC);
+    Serial.print(':');
+    Serial.print(now.second(), DEC);
+    Serial.println();    
+  }
+
+  barGraphIndex = 0;
+  memset(barGraphData, 0, sizeof(barGraphData));
 
   // by default, we'll generate the high voltage from the 3.3v line internally! (neat!)
   display.begin(SSD1306_SWITCHCAPVCC);
@@ -108,26 +134,31 @@ void setup()
   delay(500);
   display.clearDisplay();   // clears the screen and buffer
 
-  Serial.print("Initializing SD card...");
+  Serial.println("Initializing SD card...");
   // make sure that the default chip select pin is set to
   // output, even if you don't use it:
-  /*  pinMode(SS, OUTPUT);
-   
-   // see if the card is present and can be initialized:
-   if (!SD.begin(SD_CS)) {
-   Serial.println("Card failed, or not present");
-   // don't do anything more:
-   while (1) ;
-   }
-   Serial.println("card initialized.");
-   
-   // Open up the file we're going to log to!
-   dataFile = SD.open("datalog.txt", FILE_WRITE);
-   if (! dataFile) {
-   Serial.println("error opening datalog.txt");
-   // Wait forever since we cant write data
-   while (1) ;
-   }*/
+//  pinMode(SS, OUTPUT);
+
+  // see if the card is present and can be initialized:
+  if (!SD.begin(SD_CS, SD_MOSI, SD_MISO, SD_CLK)) {
+    Serial.println("Card failed, or not present");
+    // don't do anything more:
+    while (1) ;
+  }
+  Serial.println("Card initialized.");
+
+  // Open up the file we're going to log to!  
+//  char buf[12];
+//  DateTime now = RTC.now();
+//  itoa(now.unixtime(), buf, 10);
+//  Serial.print("Opening datalog at ");
+//  Serial.println(buf);
+  /*dataFile = SD.open(buf, FILE_WRITE);
+  if (! dataFile) {
+    Serial.println("error opening datalog");
+    // Wait forever since we cant write data
+    while (1) ;
+  }*/
 }
 
 
@@ -159,9 +190,9 @@ void loop()
 
 
   updateBoostDuration();
-  
+
   display.clearDisplay();
-  
+
   display.fillRect(0, 0, display.width(), 16, WHITE);
   display.setTextSize(1);
   display.setTextColor(WHITE);
@@ -178,7 +209,7 @@ void loop()
   display.println("s");
 
   drawBars();
-  
+
   display.setCursor(15, 45);
   display.setTextSize(2);
   display.setTextColor(BLACK, WHITE); // 'inverted' text
@@ -198,6 +229,8 @@ void loop()
 
   delay(CYCLE_DELAY);
 }
+
+
 
 
 
