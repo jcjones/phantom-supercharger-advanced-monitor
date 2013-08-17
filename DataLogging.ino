@@ -1,8 +1,9 @@
+#if 0
 #include <SD.h>
 #include <Wire.h>
 #include <RTClib.h>
 
-RTC_DS1307 RTC;
+RTC_DS1307 *RTC = NULL;
 File dataFile;
 
 boolean DataLogging_OpenFile(char* buf) {  
@@ -27,16 +28,17 @@ boolean DataLogging_OpenFile(char* buf) {
 
 void DataLogging_Begin(int pin_cs, int pin_mosi, int pin_miso, int pin_clk) {
   Wire.begin();
-  RTC.begin();
+  RTC = new RTC_DS1307();
+  RTC->begin();
 
-  if (! RTC.isrunning()) {
+  if (! RTC->isrunning()) {
     Serial.println("RTC is NOT running!");
     // following line sets the RTC to the date & time this sketch was compiled
     // uncomment it & upload to set the time, date and start run the RTC!
     //    RTC.adjust(DateTime(__DATE__, __TIME__));
   } 
   else {
-    DateTime now = RTC.now();
+    DateTime now = RTC->now();
     Serial.print("RTC operating acceptably. Date is ");
     Serial.print(now.year(), DEC);
     Serial.print('/');
@@ -78,4 +80,4 @@ void DataLogging_Begin(int pin_cs, int pin_mosi, int pin_miso, int pin_clk) {
 }
 
 
-
+#endif

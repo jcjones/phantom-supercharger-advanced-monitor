@@ -1,3 +1,6 @@
+#include <MemoryFree.h>
+
+
 #include "Globals.h"
 
 #include <Adafruit_SSD1306.h>
@@ -11,30 +14,18 @@ from pins_arduino.h:
  const static uint8_t SCK  = 13;
  */
 
-#if 1
-
 #define SD_CLK SCK
 #define SD_MISO MISO
 #define SD_MOSI MOSI
 #define SD_CS SS
-
+     
 /* Use for combination with SD card */
 #define OLED_CLK SCK
 #define OLED_MOSI MOSI
 #define OLED_DC 9
-#define OLED_CS 8
+#define OLED_CS 4
 #define OLED_RESET 7
 
-#else
-
-/* Solo use */
-/*#define OLED_DC 11
- #define OLED_CS 12
- #define OLED_CLK 10
- #define OLED_MOSI 9
- #define OLED_RESET 13
- */
-#endif
 
 #define VOLT_ONE A1
 #define TEMP_ONE A2
@@ -44,7 +35,27 @@ from pins_arduino.h:
 #error("Height incorrect, please fix Adafruit_SSD1306.h!");
 #endif
 
-Adafruit_SSD1306* display;
+#if (SSD1306_BUFHEIGHT != 24)
+#error("Buf height incorrect, please fix Adafruit_SSD1306.h!");
+#endif
+
+class MyOLED : public Adafruit_SSD1306 {
+  public:
+  MyOLED(int8_t reset) : Adafruit_SSD1306(reset) {};
+  MyOLED(int8_t SID, int8_t SCLK, int8_t DC, int8_t RST, int8_t CS) : Adafruit_SSD1306(SID, SCLK, DC, RST, CS) {};
+    
+  uint8_t get8Pixels(int16_t x, int16_t y) {
+    Serial.print(x);
+    Serial.print(y);
+    if (y < SSD1306_BUFHEIGHT) {
+      return Adafruit_SSD1306::get8Pixels(x, y);
+    } else {
+      return 0xFF;
+    }
+  }
+};
+
+MyOLED display (OLED_MOSI, OLED_CLK, OLED_DC, OLED_RESET, OLED_CS);
 
 float sensorTempOneC;
 float sensorTempTwoC;
@@ -77,12 +88,24 @@ void readVoltSensors()
   addBarGraphDataPoint(sensorVoltOneI);
 }
 
-void setup()
-{
-  // Open serial communications and wait for port to open:
+void setup()   {      
   Serial.begin(9600);
 
-
+  Serial.print("freeRam()=");
+  Serial.println(freeMemory());
+  
+  // by default, we'll generate the high voltage from the 3.3v line internally! (neat!)
+  display.begin(SSD1306_SWITCHCAPVCC);
+  // init done
+  Serial.println("Cow");  
+  display.display(); // show splashscreen
+  Serial.println("Dar");    
+  delay(2000);
+  Serial.println("Cle");    
+  display.clearDisplay();   // clears the screen and buffer
+  display.setCursor(0,0);
+  display.println("  Phantom");
+  display.display(); // show splashscreen  
 
   barGraphIndex = 0;
   memset(barGraphData, 0, sizeof(barGraphData));
@@ -106,20 +129,25 @@ void setup()
 
   // make sure that the default chip select pin is set to
   // output, even if you don't use it:
-  pinMode(SS, OUTPUT);
-  pinMode(OLED_CS, OUTPUT);
-  pinMode(SD_CS, OUTPUT);
+  //  pinMode(OLED_CS, OUTPUT);
+  //  pinMode(SD_CS, OUTPUT);
+  Serial.println("1-1");
+  delay(1000);
 
+  //  digitalWrite(OLED_CS, HIGH);
+  //  digitalWrite(SD_CS, HIGH);  
+  Serial.println("2");
 //  DataLogging_Begin(SD_CS, SD_MOSI, SD_MISO, SD_CLK); 
 
-  display = new Adafruit_SSD1306(OLED_MOSI, OLED_CLK, OLED_DC, OLED_RESET, OLED_CS);
-  display->display();
+
+
+  Serial.println("Finished begin");
+
 }
 
 
 
-void loop()
-{
+void loop() {
   readTempSensors();
   readVoltSensors();
 
@@ -147,31 +175,31 @@ void loop()
 
   updateBoostDuration();
 
-  //  display.clearDisplay();
-  //
-  //  display.fillRect(0, 0, display.width(), 16, WHITE);
-  //  display.setTextSize(1);
-  //  display.setTextColor(WHITE);
-  //  display.setCursor(0,0);
-  //  display.setTextColor(BLACK, WHITE); // 'inverted' text
-  //  display.print(" ESC ");
-  //  display.print(sensorTempOneC, 0);
-  //  display.print("C     CPU ");
-  //  display.print(sensorTempTwoC, 0);  
-  //  display.print("C");
-  //  display.println();
-  //  display.print("   Last Boost ");  
-  //  display.print(getLastBoostDurationMillis()/1000.0, 2);
-  //  display.println("s");
-  //
-  //  drawBars();
-  //
-  //  display.setCursor(15, 45);
-  //  display.setTextSize(2);
-  //  display.setTextColor(BLACK, WHITE); // 'inverted' text
-  //  display.print(sensorVoltOne, 2);
-  //  display.println("V");
-  //  display.display();
+  display.clearDisplay();
+
+  display.fillRect(0, 0, display.width(), 16, WHITE);
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+  display.setCursor(0,0);
+  display.setTextColor(BLACK, WHITE); // 'inverted' text
+  display.print(" ESC ");
+  display.print(sensorTempOneC, 0);
+  display.print("C     CPU ");
+  display.print(sensorTempTwoC, 0);  
+  display.print("C");
+  display.println();
+  display.print("   Last Boost ");  
+  display.print(getLastBoostDurationMillis()/1000.0, 2);
+  display.println("s");
+
+  drawBars();
+
+  display.setCursor(15, 45);
+  display.setTextSize(2);
+  display.setTextColor(BLACK, WHITE); // 'inverted' text
+  display.print(sensorVoltOne, 2);
+  display.println("V");
+  display.display();
 
 
 
@@ -185,6 +213,7 @@ void loop()
 
   delay(CYCLE_DELAY);
 }
+
 
 
 
