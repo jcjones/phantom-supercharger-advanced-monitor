@@ -3,7 +3,7 @@
 
 #include "Globals.h"
 
-#include <Adafruit_SSD1306.h>
+#include <JCJ_SSD1306.h>
 #include <Adafruit_GFX.h>
 
 #include <avr/pgmspace.h>
@@ -43,17 +43,18 @@ from pins_arduino.h:
 
 class MyOLED : public Adafruit_SSD1306 {
   public:
-  MyOLED(int8_t reset) : Adafruit_SSD1306(reset) {};
-  MyOLED(int8_t SID, int8_t SCLK, int8_t DC, int8_t RST, int8_t CS) : Adafruit_SSD1306(SID, SCLK, DC, RST, CS) {};
-    
-  uint8_t get8Pixels(int16_t x, int16_t y) {
-    Serial.print(x);
-    Serial.print(y);
-    if (y < SSD1306_BUFHEIGHT) {
-      return Adafruit_SSD1306::get8Pixels(x, y);
-    } else {
-      return 0xFF;
-    }
+    MyOLED(int8_t reset) : Adafruit_SSD1306(reset) {};
+    MyOLED(int8_t SID, int8_t SCLK, int8_t DC, int8_t RST, int8_t CS) : Adafruit_SSD1306(SID, SCLK, DC, RST, CS) {};    
+    uint8_t get8Pixels(int16_t x, int16_t y);
+};
+
+uint8_t MyOLED::get8Pixels(int16_t x, int16_t y) {
+  Serial.print(x);
+  Serial.print(y);
+  if (y < SSD1306_BUFHEIGHT) {
+    return Adafruit_SSD1306::get8Pixels(x, y);
+  } else {
+    return 0xFF;
   }
 };
 
@@ -127,29 +128,14 @@ void setup()   {
 void loop() {
   readTempSensors();
   readVoltSensors();
-
-  /*
+  
   // Write to disk
-   dataFile.print(millis());
-   dataFile.print(",");
-   dataFile.print(sensorVoltOne, 2);
-   dataFile.print(",");
-   dataFile.print(sensorTempOneC, 2);
-   dataFile.print(",");
-   dataFile.print(sensorTempTwoC, 2);
-   dataFile.println();
-   */
+  if ((millis() / 1000l) % 5 == 0 ) {
+    logData(sensorVoltOne, sensorTempOneC, sensorTempTwoC);
+    showMem();    
+  }
 
-  // print to the serial port too
-//  Serial.print("V: ");  
-//  Serial.print(sensorVoltOne, 2);
-//  Serial.print(" SC: ");  
-//  Serial.print(sensorTempOneC, 2);
-//  Serial.print(" CPU: ");  
-//  Serial.print(sensorTempTwoC, 2);
-//  Serial.println();
-
-
+  // Update the boost info
   updateBoostDuration();
 
   display.clearDisplay();
@@ -189,7 +175,7 @@ void loop() {
   // will save the file only every 512 bytes - every time a sector on the 
   // SD card is filled with data.
   /*  dataFile.flush();*/
-
+  
   delay(CYCLE_DELAY);
 }
 

@@ -78,3 +78,14 @@ void DataLogging_Begin(int pin_cs, int pin_mosi, int pin_miso, int pin_clk) {
   }    
 }
 
+void logData(float sensorVoltOne, float sensorTempOneC, float sensorTempTwoC) {
+   dataFile.print(millis());
+   dataFile.print(",");
+   dataFile.print(sensorVoltOne, 2);
+   dataFile.print(",");
+   dataFile.print(sensorTempOneC, 2);
+   dataFile.print(",");
+   dataFile.print(sensorTempTwoC, 2);
+   dataFile.println();
+   dataFile.flush();
+}
