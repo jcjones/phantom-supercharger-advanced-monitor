@@ -19,12 +19,12 @@ void addBarGraphDataPoint(int value) {
 }
 
 int getBarGraphDataPointInPast(int cycleOffset) {
-  return barGraphData[(barGraphIndex - cycleOffset) % sizeof(barGraphData)];
+  return barGraphData[(barGraphIndex - cycleOffset) % BARGRAPH_DATA_SZ];
 }
 
 void drawBars() {
 //  for(uint8_t i = 0; i < display.width(); i++) {
-//    int barHeight = getBarGraphDataPointInPast(i);//barGraphData[(barGraphIndex - i) % sizeof(barGraphData)];
+//    int barHeight = getBarGraphDataPointInPast(i);//barGraphData[(barGraphIndex - i) % BARGRAPH_DATA_SZ];
 //    //    Serial.print(i);
 //    //    Serial.print(" = ");
 //    //    Serial.println(barHeight);

@@ -1,4 +1,3 @@
-#if 0
 #include <SD.h>
 #include <Wire.h>
 #include <RTClib.h>
@@ -32,52 +31,50 @@ void DataLogging_Begin(int pin_cs, int pin_mosi, int pin_miso, int pin_clk) {
   RTC->begin();
 
   if (! RTC->isrunning()) {
-    Serial.println("RTC is NOT running!");
+    Serial.println(F("RTC is not running!"));
     // following line sets the RTC to the date & time this sketch was compiled
     // uncomment it & upload to set the time, date and start run the RTC!
     //    RTC.adjust(DateTime(__DATE__, __TIME__));
   } 
   else {
     DateTime now = RTC->now();
-    Serial.print("RTC operating acceptably. Date is ");
+    Serial.print(F("RTC operating acceptably. Date is "));
     Serial.print(now.year(), DEC);
-    Serial.print('/');
+//    Serial.print('/');
     Serial.print(now.month(), DEC);
-    Serial.print('/');
+//    Serial.print('/');
     Serial.print(now.day(), DEC);
-    Serial.print(' ');
+//    Serial.print(' ');
     Serial.print(now.hour(), DEC);
-    Serial.print(':');
+//    Serial.print(':');
     Serial.print(now.minute(), DEC);
-    Serial.print(':');
+//    Serial.print(':');
     Serial.print(now.second(), DEC);
     Serial.println();    
   }      
 
   // see if the card is present and can be initialized:
   if (!SD.begin(pin_cs, pin_mosi, pin_miso, pin_clk)) {
-    Serial.println("Card failed, or not present");
+//    Serial.println("Card failed, or not present");
     // don't do anything more:
     while (1) ;
   }
-  Serial.println("Card initialized."); 
+//  Serial.println("Card initialized."); 
 
   // Open up the file we're going to log to!  
-  char buf[13];
-  buf[0] = '\0';
+  char buffer[13];
+  buffer[0] = '\0';
 
-  if (DataLogging_OpenFile(buf)) {
-    Serial.print("Opened datalog at ");
-    Serial.println(buf);
+  if (DataLogging_OpenFile(buffer)) {
+    Serial.print(F("Opened datalog at "));
+    Serial.println(buffer);
     
   } else {
-    Serial.print("Error opening datalog at ");
-    Serial.println(buf);
+    Serial.print(F("Error opening datalog at "));
+    Serial.println(buffer);
     
     // Wait forever since we cant write data
     while (1) ;
   }    
 }
 
-
-#endif

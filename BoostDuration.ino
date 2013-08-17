@@ -17,11 +17,11 @@ int getLastBoostDurationMillis() {
 int updateBoostDuration() {
   float dxdt = (float)(getBarGraphDataPointInPast(0) - getBarGraphDataPointInPast(2)) / (CYCLE_DELAY * 3.0); // 3 ticks total
   
-  Serial.print("Boost ");
-  Serial.print(dxdt,2);
-  Serial.print(" stat ");
-  Serial.print(boosting?"t":"f");
-  Serial.println("");
+//  Serial.print("Boost ");
+//  Serial.print(dxdt,2);
+//  Serial.print(" stat ");
+//  Serial.print(boosting?"t":"f");
+//  Serial.println("");
   
   if (dxdt >= 0.0) {
     if (boosting) {

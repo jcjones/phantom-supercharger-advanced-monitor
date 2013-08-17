@@ -6,6 +6,8 @@
 #include <Adafruit_SSD1306.h>
 #include <Adafruit_GFX.h>
 
+#include <avr/pgmspace.h>
+
 /*
 from pins_arduino.h:
  const static uint8_t SS = 10;
@@ -35,7 +37,7 @@ from pins_arduino.h:
 #error("Height incorrect, please fix Adafruit_SSD1306.h!");
 #endif
 
-#if (SSD1306_BUFHEIGHT != 24)
+#if (SSD1306_BUFHEIGHT != 16)
 #error("Buf height incorrect, please fix Adafruit_SSD1306.h!");
 #endif
 
@@ -88,64 +90,39 @@ void readVoltSensors()
   addBarGraphDataPoint(sensorVoltOneI);
 }
 
+void showMem() {
+  Serial.print(F("Free RAM ="));
+  Serial.println(freeMemory());
+}
+
+
 void setup()   {      
   Serial.begin(9600);
 
-  Serial.print("freeRam()=");
-  Serial.println(freeMemory());
+  showMem();
   
   // by default, we'll generate the high voltage from the 3.3v line internally! (neat!)
   display.begin(SSD1306_SWITCHCAPVCC);
   // init done
-  Serial.println("Cow");  
-  display.display(); // show splashscreen
-  Serial.println("Dar");    
-  delay(2000);
-  Serial.println("Cle");    
   display.clearDisplay();   // clears the screen and buffer
+
+  display.setTextSize(1);
   display.setCursor(0,0);
-  display.println("  Phantom");
+  display.setTextColor(WHITE); // 'inverted' text
+  display.println(F("      Phantom"));
+  display.println(F("   Superchargers"));  
   display.display(); // show splashscreen  
+  delay(3000);
 
+  // Configure SD card
+  DataLogging_Begin(SD_CS, SD_MOSI, SD_MISO, SD_CLK); 
+
+  // Setup bar graph
   barGraphIndex = 0;
-  memset(barGraphData, 0, sizeof(barGraphData));
+  memset(barGraphData, 0, BARGRAPH_DATA_SZ);
 
-  // by default, we'll generate the high voltage from the 3.3v line internally! (neat!)
-  //  display.begin(SSD1306_SWITCHCAPVCC);
-
-  // init done
-  //  display.display(); // show splashscreen
-  //  delay(250);
-  //  display.clearDisplay();   // clears the screen and buffer
-  //
-  //  display.setTextSize(2);
-  //  display.setTextColor(WHITE);
-  //  display.println("  Phantom");
-  //  display.println("   Super-");
-  //  display.println("  charger");
-  //  display.display();
-  //  delay(500);
-  //  display.clearDisplay();   // clears the screen and buffer
-
-  // make sure that the default chip select pin is set to
-  // output, even if you don't use it:
-  //  pinMode(OLED_CS, OUTPUT);
-  //  pinMode(SD_CS, OUTPUT);
-  Serial.println("1-1");
-  delay(1000);
-
-  //  digitalWrite(OLED_CS, HIGH);
-  //  digitalWrite(SD_CS, HIGH);  
-  Serial.println("2");
-//  DataLogging_Begin(SD_CS, SD_MOSI, SD_MISO, SD_CLK); 
-
-
-
-  Serial.println("Finished begin");
-
+  showMem();
 }
-
-
 
 void loop() {
   readTempSensors();
@@ -164,13 +141,13 @@ void loop() {
    */
 
   // print to the serial port too
-  Serial.print("V: ");  
-  Serial.print(sensorVoltOne, 2);
-  Serial.print(" SC: ");  
-  Serial.print(sensorTempOneC, 2);
-  Serial.print(" CPU: ");  
-  Serial.print(sensorTempTwoC, 2);
-  Serial.println();
+//  Serial.print("V: ");  
+//  Serial.print(sensorVoltOne, 2);
+//  Serial.print(" SC: ");  
+//  Serial.print(sensorTempOneC, 2);
+//  Serial.print(" CPU: ");  
+//  Serial.print(sensorTempTwoC, 2);
+//  Serial.println();
 
 
   updateBoostDuration();
@@ -182,13 +159,15 @@ void loop() {
   display.setTextColor(WHITE);
   display.setCursor(0,0);
   display.setTextColor(BLACK, WHITE); // 'inverted' text
-  display.print(" ESC ");
+
+  display.print(F(" ESC "));
   display.print(sensorTempOneC, 0);
-  display.print("C     CPU ");
+  
+  display.print(F("C     CPU "));
   display.print(sensorTempTwoC, 0);  
   display.print("C");
   display.println();
-  display.print("   Last Boost ");  
+  display.print(F("   Last Boost "));  
   display.print(getLastBoostDurationMillis()/1000.0, 2);
   display.println("s");
 
