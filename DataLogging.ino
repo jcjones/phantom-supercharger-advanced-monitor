@@ -21,7 +21,6 @@ void dateTime(uint16_t* date, uint16_t* time) {
 boolean DataLogging_OpenFile(char* buf) {  
   char buf2[5];
   
-
   for (int i=0; i<9999; i++) {
     buf[0]='\0';
     buf2[0]='\0';
@@ -45,7 +44,8 @@ void DataLogging_Begin(int pin_cs, int pin_mosi, int pin_miso, int pin_clk) {
   RTC->begin();
 
   if (! RTC->isrunning()) {
-    fatalError("RTC unintialized");
+    showFatal("RTC unintialized");
+    return;
     // following line sets the RTC to the date & time this sketch was compiled
     // uncomment it & upload to set the time, date and start run the RTC!
     //    RTC.adjust(DateTime(__DATE__, __TIME__));
@@ -64,10 +64,8 @@ void DataLogging_Begin(int pin_cs, int pin_mosi, int pin_miso, int pin_clk) {
 
   // see if the card is present and can be initialized:
   if (!SD.begin(pin_cs, pin_mosi, pin_miso, pin_clk)) {
-    fatalError("SD Card Not Present");
-    
-    // Stop
-    while (1) ;
+    showError("SD Card Not Present");
+    return;
   }
 
   // Set the timestamp callback
@@ -81,15 +79,16 @@ void DataLogging_Begin(int pin_cs, int pin_mosi, int pin_miso, int pin_clk) {
     Serial.print(F("Opened datalog at "));
     Serial.println(buffer);
     
-  } else {
-    fatalError("Error opening log.");
-    delay(1000);
-    fatalError(buffer);    
+    // Print CSV header
+    dataFile.println(F("timeMs,voltage,tempOneC,tempTwoC"));
+    dataFile.flush();
     
-    // Stop
-    while (1) ;
-  }    
+  } else {
+    showError("Error opening log.");
+    return;
+  }
 }
+
 
 void logData(float sensorVoltOne, float sensorTempOneC, float sensorTempTwoC) {
    dataFile.print(millis());

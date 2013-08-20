@@ -1,10 +1,7 @@
 #include <RunningAverage.h>
-
-#include "Globals.h"
-
 #include <MemoryFree.h>
-#include <JCJ_SSD1306.h>
-#include <Adafruit_GFX.h>
+#include "Globals.h"
+#include "U8glib.h"
 
 /*
 from pins_arduino.h:
@@ -35,7 +32,6 @@ DC Green 9
 Rest S-Green 7
 CS Orange 8
 NC S-Orange
-
 */
 
 
@@ -44,16 +40,7 @@ NC S-Orange
 #define TEMP_TWO A1
 #define AREF_VOLTAGE 3.3
 
-#if (SSD1306_LCDHEIGHT != 64)
-#error("Height incorrect, please fix Adafruit_SSD1306.h!");
-#endif
-
-#if (SSD1306_BUFHEIGHT != 16)
-#error("Buf height incorrect, please fix Adafruit_SSD1306.h!");
-#endif
-
-
-Adafruit_SSD1306 display (OLED_MOSI, OLED_CLK, OLED_DC, OLED_RESET, OLED_CS);
+U8GLIB_SSD1306_128X64 u8g(OLED_CLK, OLED_MOSI, OLED_CS, OLED_DC, OLED_RESET); // HW SPI Com: CS = 10, A0 = 9 (Hardware Pins are  SCK = 13 and MOSI = 11)
 
 float sensorTempOneC;
 float sensorTempTwoC;
@@ -63,6 +50,22 @@ RunningAverage sensorTempTwoI(3);
 float sensorVoltOne;
 int sensorVoltOneI;
 
+// Used by the Fatal state
+char fatalErrorMessage[33];
+
+#define STATE_SPLASH 0
+#define STATE_ERROR 8
+#define STATE_FATAL 9
+#define STATE_NORMAL 1
+int displayState;
+
+void changeState(int newState) {
+  Serial.print(F("S_OLD: "));
+  Serial.print(displayState);  
+  Serial.print(F("   S_NEW: "));
+  Serial.println(newState);  
+  displayState = newState;
+}
 
 void readTempSensors()
 {
@@ -79,20 +82,20 @@ void readTempSensors()
   float sensorTempTwoV = sensorTempTwoI.getAverage() * AREF_VOLTAGE;
   sensorTempTwoV /= 1024.0;
   sensorTempTwoC = (sensorTempTwoV - 0.5) * 100;  
-  
-  Serial.print(F("1:"));  
-  Serial.print(sensorTempOneI.getAverage(), 2);  
-  Serial.print(" V ");
-  Serial.print(sensorTempOneV, 2);
-  Serial.print(" C ");
-  Serial.print(sensorTempOneC, 2);
-
-  Serial.print(F("    2:"));
-  Serial.print(sensorTempTwoI.getAverage(), 2);  
-  Serial.print(" V ");
-  Serial.print(sensorTempTwoV, 2);
-  Serial.print(" C ");
-  Serial.println(sensorTempTwoC, 2);
+//  
+//  Serial.print(F("1:"));  
+//  Serial.print(sensorTempOneI.getAverage(), 2);  
+//  Serial.print(" V ");
+//  Serial.print(sensorTempOneV, 2);
+//  Serial.print(" C ");
+//  Serial.print(sensorTempOneC, 2);
+//
+//  Serial.print(F("    2:"));
+//  Serial.print(sensorTempTwoI.getAverage(), 2);  
+//  Serial.print(" V ");
+//  Serial.print(sensorTempTwoV, 2);
+//  Serial.print(" C ");
+//  Serial.println(sensorTempTwoC, 2);
   
 }
 
@@ -102,7 +105,7 @@ void readVoltSensors()
   sensorVoltOneI = analogRead(VOLT_ONE);
 
   // fake it
-  sensorVoltOneI = (millis()/10)%1023; // fake fake TODO
+  sensorVoltOneI = constrain((millis()/10)%1023, 440, 1023); // fake fake TODO
 
   sensorVoltOne = sensorVoltOneI * (28.0 / 1024.0);
 
@@ -114,65 +117,104 @@ void showMem() {
   Serial.println(freeMemory());
 }
 
-void fatalError(char* buf){
-  display.clearDisplay();   // clears the screen and buffer
-
-  display.setTextSize(1);
-  display.setCursor(0,0);
-  display.setTextColor(WHITE); // 'inverted' text
-  display.println(buf);
-  display.display(); // show splashscreen  
+void showFatal(const char* buf){
+  fatalErrorMessage[0] = '\0';
+  strncpy(fatalErrorMessage, buf, sizeof(fatalErrorMessage));
+  Serial.print(F("FATAL ERROR:"));
+  Serial.println(fatalErrorMessage);
+  changeState(STATE_FATAL);
 }
+
+void showError(const char* buf){
+  fatalErrorMessage[0] = '\0';
+  strncpy(fatalErrorMessage, buf, sizeof(fatalErrorMessage));
+  Serial.print(F("FATAL ERROR:"));
+  Serial.println(fatalErrorMessage);
+  changeState(STATE_ERROR);
+}
+
+void draw() {
+  switch (displayState) {
+    case STATE_FATAL:
+    case STATE_ERROR:
+      u8g.setColorIndex(1);
+      u8g.setFont(u8g_font_6x10);
+      u8g.drawFrame(0, 0, DISPLAY_WIDTH, 34);
+      u8g.drawStr( 28, 12, F("Fatal Error:"));
+      u8g.drawStr( 6, 24, fatalErrorMessage);
+      break;
+    case STATE_SPLASH:
+      u8g.setColorIndex(1);
+      u8g.setFont(u8g_font_6x10);
+      u8g.drawStr( 28, 12, F("PHANTOM"));
+      u8g.drawStr( 24, 24, F("ELECTRIC"));
+      u8g.drawStr( 3, 36, F("SUPERCHARGERS"));      
+      break;
+    case STATE_NORMAL:
+      u8g.setColorIndex(1);
+      u8g.setFont(u8g_font_6x10);
+      u8g.setPrintPos(2, 12);
+      u8g.print(F("ESC "));
+      u8g.print(sensorTempOneC, 1);
+      u8g.print(F("C  CPU "));
+      u8g.print(sensorTempTwoC, 1);
+      u8g.print(F(" C"));
+      u8g.setPrintPos(12, 24);      
+      u8g.print(F("Last Boost: "));
+      u8g.print(getLastBoostDurationMillis()/1000.0, 2);
+      u8g.print(F(" s"));
+      
+      for(int i=0; i<BARGRAPH_DATA_SZ; i++) {
+        int h = getBarGraphDataPointInPast(i);
+        int x = i*2;
+        int yStart = DISPLAY_HEIGHT - h;
+//        if (yStart < 40) {
+//          Serial.print("yStart h: ");
+//          Serial.print(h);
+//          Serial.print(" i was: ");
+//          Serial.println(i);
+//        }
+        u8g.drawVLine(DISPLAY_WIDTH-x, yStart, h);
+        u8g.drawVLine(DISPLAY_WIDTH-x+1, yStart, h);        
+      }
+      
+      u8g.setColorIndex(0);
+      u8g.drawRBox(48, 36, 38, 12, 2);
+      u8g.setColorIndex(1);
+      u8g.setPrintPos(50, 45);
+      u8g.print(sensorVoltOne, 1);
+      u8g.print(F(" V"));
+      
+      break;   
+  }
+}
+
 
 void setup()   {       
   Serial.begin(9600);
   analogReference(EXTERNAL);
+  
+  u8g.setHardwareBackup(u8g_backup_avr_spi);
+  
+  pinMode(SD_CS, OUTPUT);
+  pinMode(OLED_CS, OUTPUT);
+  
+  changeState(STATE_SPLASH);
 
   showMem();
-  
-  // by default, we'll generate the high voltage from the 3.3v line internally! (neat!)
-  display.begin(SSD1306_SWITCHCAPVCC);
-  // init done
-  display.clearDisplay();   // clears the screen and buffer
-  
-  // Set the graph callback
-  display.setGet8PixelsUnbuffered(getBootPixels);  
-  
-  // Prepare for text
-  display.setTextSize(1);
-  display.setCursor(0,0);
-  display.setTextColor(WHITE); // 'inverted' text
-  display.println(F("      Phantom"));
-  display.println(F("   Superchargers"));  
-  display.display(); // show splashscreen  
-  delay(3000);
-
-  // Configure SD card
-  DataLogging_Begin(SD_CS, SD_MOSI, SD_MISO, SD_CLK); 
 
   // Setup bar graph
-  barGraphIndex = 0;
-  memset(barGraphData, 0, BARGRAPH_DATA_SZ);
+  setupBarGraph();
 
   showMem();
-}
-
-uint8_t getBootPixels(int16_t x, int16_t y) {
-  if (y % 2 == 0) {
-    return 0xFF;
-  } 
-    
-  return 0;
 }
 
 // Used to space out disk writes
 long lastLogUpdate = 0;
 
-void loop() {
+void loopNormal() {
   readTempSensors();
   readVoltSensors();
-
-  display.setGet8PixelsUnbuffered(getGraphPixels);
   
   long time = millis();
   if (time - DISK_WRITE_INTERVAL_MS > lastLogUpdate) {
@@ -184,53 +226,41 @@ void loop() {
   }
 
   // Update the boost info
-  updateBoostDuration();
+  updateBoostDuration();  
+}
+
+void loop() {
   
-
-  display.clearDisplay();
-
-  display.fillRect(0, 0, display.width(), 16, WHITE);
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  display.setCursor(0,0);
-  display.setTextColor(BLACK, WHITE); // 'inverted' text
-
-  display.print(F(" ESC "));
-  display.print(sensorTempOneC, 0);
+  // Draw
+  u8g.firstPage();  
+  do {
+    draw();
+  } while( u8g.nextPage() );
   
-  display.print(F("C     CPU "));
-  display.print(sensorTempTwoC, 0);  
-  display.print("C");
-  display.println();
-  display.print(F("   Last Boost "));  
-  display.print(getLastBoostDurationMillis()/1000.0, 2);
-  display.println("s");
-
-  drawBars();
-
-  display.setCursor(15, 45);
-  display.setTextSize(2);
-  display.setTextColor(BLACK, WHITE); // 'inverted' text
-  display.print(sensorVoltOne, 2);
-  display.println("V");
-  display.display();
-
-
-
-  // The following line will 'save' the file to the SD card after every
-  // line of data - this will use more power and slow down how much data
-  // you can read but it's safer! 
-  // If you want to speed up the system, remove the call to flush() and it
-  // will save the file only every 512 bytes - every time a sector on the 
-  // SD card is filled with data.
-  /*  dataFile.flush();*/
+  // State transitions
+  switch(displayState){
+    case STATE_SPLASH:
+      changeState(STATE_NORMAL);
+      // Initialize the data logger
+      DataLogging_Begin(SD_CS, SD_MOSI, SD_MISO, SD_CLK);
+      delay(2000);
+      break;
+    case STATE_FATAL:
+      while(1) {
+        // Forever
+      }
+      break;
+    case STATE_ERROR:
+      changeState(STATE_NORMAL);
+      delay(4000);      
+      break;
+    case STATE_NORMAL:
+      loopNormal();    
+      break;
+   }
   
   delay(CYCLE_DELAY);
 }
-
-
-
-
 
 
 

@@ -1,42 +1,30 @@
 #include "Globals.h"
 
-#define GRAPH_HEIGHT ( SSD1306_LCDHEIGHT - SSD1306_BUFHEIGHT - 1 )
+uint8_t barGraphData[BARGRAPH_DATA_SZ];
+int barGraphIndex = 0;
+
+void setupBarGraph() {
+  barGraphIndex = 0;
+  memset(barGraphData, 0, BARGRAPH_DATA_SZ);
+}
 
 void addBarGraphDataPoint(int value) {
   barGraphIndex += 1;
-  if (barGraphIndex > display.width()){
+  if (barGraphIndex > BARGRAPH_DATA_SZ){
     barGraphIndex = 0;
   }
 
-  barGraphData[barGraphIndex] = map(value, 0, 1023, 0, GRAPH_HEIGHT);
-
-  //  Serial.print("Updating ");
-  //  Serial.print(barGraphCurrent);
-  //  Serial.print(" with ");
-  //  Serial.print(value);
-  //  Serial.print(" which is ");
-  //  Serial.println(barGraphData[barGraphCurrent]);
+  // From 16 V to 28 V, scaled
+  value = constrain(value, 440, 1023);  
+  barGraphData[barGraphIndex] = map(value, 440, 1023, 0, GRAPH_HEIGHT);
 }
 
 int getBarGraphDataPointInPast(int cycleOffset) {
-  return barGraphData[(barGraphIndex - cycleOffset) % BARGRAPH_DATA_SZ];
-}
-
-uint8_t getGraphPixels(int16_t x, int16_t y) {
-  int barHeight = getBarGraphDataPointInPast(x);
+  if ((cycleOffset > BARGRAPH_DATA_SZ) || (cycleOffset < 0)) {
+    showFatal("Invalid offset");
+  }
   
-  return barHeight;
+  int idx = (BARGRAPH_DATA_SZ + (barGraphIndex - cycleOffset)) % BARGRAPH_DATA_SZ;
+  return barGraphData[idx];
 }
-
-void drawBars() {
-//  for(uint8_t i = 0; i < display.width(); i++) {
-//    
-//    //    Serial.print(i);
-//    //    Serial.print(" = ");
-//    //    Serial.println(barHeight);
-//
-//    display.drawFastVLine(display.width()-i, display.height()-barHeight, barHeight, WHITE);
-//  }
-}
-
 
