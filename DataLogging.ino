@@ -5,8 +5,22 @@
 RTC_DS1307 *RTC = NULL;
 File dataFile;
 
+void dateTime(uint16_t* date, uint16_t* time) {
+  // User gets date and time from GPS or real-time
+  // clock in real callback function
+
+  DateTime now = RTC->now();
+  
+  // return date using FAT_DATE macro to format fields
+  *date = FAT_DATE(now.year(), now.month(), now.day());
+
+  // return time using FAT_TIME macro to format fields
+  *time = FAT_TIME(now.hour(), now.minute(), now.second());
+}
+
 boolean DataLogging_OpenFile(char* buf) {  
   char buf2[5];
+  
 
   for (int i=0; i<9999; i++) {
     buf[0]='\0';
@@ -31,7 +45,7 @@ void DataLogging_Begin(int pin_cs, int pin_mosi, int pin_miso, int pin_clk) {
   RTC->begin();
 
   if (! RTC->isrunning()) {
-    Serial.println(F("RTC is not running!"));
+    fatalError("RTC unintialized");
     // following line sets the RTC to the date & time this sketch was compiled
     // uncomment it & upload to set the time, date and start run the RTC!
     //    RTC.adjust(DateTime(__DATE__, __TIME__));
@@ -40,26 +54,24 @@ void DataLogging_Begin(int pin_cs, int pin_mosi, int pin_miso, int pin_clk) {
     DateTime now = RTC->now();
     Serial.print(F("RTC operating acceptably. Date is "));
     Serial.print(now.year(), DEC);
-//    Serial.print('/');
     Serial.print(now.month(), DEC);
-//    Serial.print('/');
     Serial.print(now.day(), DEC);
-//    Serial.print(' ');
     Serial.print(now.hour(), DEC);
-//    Serial.print(':');
     Serial.print(now.minute(), DEC);
-//    Serial.print(':');
     Serial.print(now.second(), DEC);
     Serial.println();    
   }      
 
   // see if the card is present and can be initialized:
   if (!SD.begin(pin_cs, pin_mosi, pin_miso, pin_clk)) {
-//    Serial.println("Card failed, or not present");
-    // don't do anything more:
+    fatalError("SD Card Not Present");
+    
+    // Stop
     while (1) ;
   }
-//  Serial.println("Card initialized."); 
+
+  // Set the timestamp callback
+  SdFile::dateTimeCallback(dateTime);
 
   // Open up the file we're going to log to!  
   char buffer[13];
@@ -70,10 +82,11 @@ void DataLogging_Begin(int pin_cs, int pin_mosi, int pin_miso, int pin_clk) {
     Serial.println(buffer);
     
   } else {
-    Serial.print(F("Error opening datalog at "));
-    Serial.println(buffer);
+    fatalError("Error opening log.");
+    delay(1000);
+    fatalError(buffer);    
     
-    // Wait forever since we cant write data
+    // Stop
     while (1) ;
   }    
 }

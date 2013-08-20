@@ -1,14 +1,14 @@
 #include "Globals.h"
 
-#define GRAPH_HEIGHT 40
+#define GRAPH_HEIGHT ( SSD1306_LCDHEIGHT - SSD1306_BUFHEIGHT - 1 )
 
 void addBarGraphDataPoint(int value) {
-//  barGraphIndex += 1;
-//  if (barGraphIndex > display.width()){
-//    barGraphIndex = 0;
-//  }
-//
-//  barGraphData[barGraphIndex] = map(value, 0, 1023, 0, GRAPH_HEIGHT);
+  barGraphIndex += 1;
+  if (barGraphIndex > display.width()){
+    barGraphIndex = 0;
+  }
+
+  barGraphData[barGraphIndex] = map(value, 0, 1023, 0, GRAPH_HEIGHT);
 
   //  Serial.print("Updating ");
   //  Serial.print(barGraphCurrent);
@@ -22,9 +22,15 @@ int getBarGraphDataPointInPast(int cycleOffset) {
   return barGraphData[(barGraphIndex - cycleOffset) % BARGRAPH_DATA_SZ];
 }
 
+uint8_t getGraphPixels(int16_t x, int16_t y) {
+  int barHeight = getBarGraphDataPointInPast(x);
+  
+  return barHeight;
+}
+
 void drawBars() {
 //  for(uint8_t i = 0; i < display.width(); i++) {
-//    int barHeight = getBarGraphDataPointInPast(i);//barGraphData[(barGraphIndex - i) % BARGRAPH_DATA_SZ];
+//    
 //    //    Serial.print(i);
 //    //    Serial.print(" = ");
 //    //    Serial.println(barHeight);

@@ -1,12 +1,10 @@
-#include <MemoryFree.h>
-
+#include <RunningAverage.h>
 
 #include "Globals.h"
 
+#include <MemoryFree.h>
 #include <JCJ_SSD1306.h>
 #include <Adafruit_GFX.h>
-
-#include <avr/pgmspace.h>
 
 /*
 from pins_arduino.h:
@@ -25,13 +23,26 @@ from pins_arduino.h:
 #define OLED_CLK SCK
 #define OLED_MOSI MOSI
 #define OLED_DC 9
-#define OLED_CS 4
+#define OLED_CS 8
 #define OLED_RESET 7
 
+/*
+5V Brown
+Gnd S-Blue
+Data S-Brown 11
+Clk Blue 13
+DC Green 9
+Rest S-Green 7
+CS Orange 8
+NC S-Orange
 
-#define VOLT_ONE A1
-#define TEMP_ONE A2
-#define TEMP_TWO A3
+*/
+
+
+#define VOLT_ONE A3
+#define TEMP_ONE A0
+#define TEMP_TWO A1
+#define AREF_VOLTAGE 3.3
 
 #if (SSD1306_LCDHEIGHT != 64)
 #error("Height incorrect, please fix Adafruit_SSD1306.h!");
@@ -41,41 +52,48 @@ from pins_arduino.h:
 #error("Buf height incorrect, please fix Adafruit_SSD1306.h!");
 #endif
 
-class MyOLED : public Adafruit_SSD1306 {
-  public:
-    MyOLED(int8_t reset) : Adafruit_SSD1306(reset) {};
-    MyOLED(int8_t SID, int8_t SCLK, int8_t DC, int8_t RST, int8_t CS) : Adafruit_SSD1306(SID, SCLK, DC, RST, CS) {};    
-    uint8_t get8Pixels(int16_t x, int16_t y);
-};
 
-uint8_t MyOLED::get8Pixels(int16_t x, int16_t y) {
-  Serial.print(x);
-  Serial.print(y);
-  if (y < SSD1306_BUFHEIGHT) {
-    return Adafruit_SSD1306::get8Pixels(x, y);
-  } else {
-    return 0xFF;
-  }
-};
-
-MyOLED display (OLED_MOSI, OLED_CLK, OLED_DC, OLED_RESET, OLED_CS);
+Adafruit_SSD1306 display (OLED_MOSI, OLED_CLK, OLED_DC, OLED_RESET, OLED_CS);
 
 float sensorTempOneC;
 float sensorTempTwoC;
+RunningAverage sensorTempOneI(3);
+RunningAverage sensorTempTwoI(3);
+
 float sensorVoltOne;
 int sensorVoltOneI;
+
 
 void readTempSensors()
 {
   analogRead(TEMP_ONE); // Discard the first read
-  int sensorTempOneI = analogRead(TEMP_ONE);
-  float sensorTempOneV = sensorTempOneI * (5.0 / 1024.0);
+  sensorTempOneI.addValue(analogRead(TEMP_ONE));
+  
+  float sensorTempOneV = sensorTempOneI.getAverage() * AREF_VOLTAGE;
+  sensorTempOneV /= 1024.0;
   sensorTempOneC = (sensorTempOneV - 0.5) * 100;
 
   analogRead(TEMP_TWO); // Discard the first read
-  int sensorTempTwoI = analogRead(TEMP_TWO);
-  float sensorTempTwoV = sensorTempTwoI * (5.0 / 1024.0);
+  sensorTempTwoI.addValue(analogRead(TEMP_TWO));
+  
+  float sensorTempTwoV = sensorTempTwoI.getAverage() * AREF_VOLTAGE;
+  sensorTempTwoV /= 1024.0;
   sensorTempTwoC = (sensorTempTwoV - 0.5) * 100;  
+  
+  Serial.print(F("1:"));  
+  Serial.print(sensorTempOneI.getAverage(), 2);  
+  Serial.print(" V ");
+  Serial.print(sensorTempOneV, 2);
+  Serial.print(" C ");
+  Serial.print(sensorTempOneC, 2);
+
+  Serial.print(F("    2:"));
+  Serial.print(sensorTempTwoI.getAverage(), 2);  
+  Serial.print(" V ");
+  Serial.print(sensorTempTwoV, 2);
+  Serial.print(" C ");
+  Serial.println(sensorTempTwoC, 2);
+  
 }
 
 void readVoltSensors()
@@ -96,9 +114,19 @@ void showMem() {
   Serial.println(freeMemory());
 }
 
+void fatalError(char* buf){
+  display.clearDisplay();   // clears the screen and buffer
 
-void setup()   {      
+  display.setTextSize(1);
+  display.setCursor(0,0);
+  display.setTextColor(WHITE); // 'inverted' text
+  display.println(buf);
+  display.display(); // show splashscreen  
+}
+
+void setup()   {       
   Serial.begin(9600);
+  analogReference(EXTERNAL);
 
   showMem();
   
@@ -106,7 +134,11 @@ void setup()   {
   display.begin(SSD1306_SWITCHCAPVCC);
   // init done
   display.clearDisplay();   // clears the screen and buffer
-
+  
+  // Set the graph callback
+  display.setGet8PixelsUnbuffered(getBootPixels);  
+  
+  // Prepare for text
   display.setTextSize(1);
   display.setCursor(0,0);
   display.setTextColor(WHITE); // 'inverted' text
@@ -125,18 +157,35 @@ void setup()   {
   showMem();
 }
 
+uint8_t getBootPixels(int16_t x, int16_t y) {
+  if (y % 2 == 0) {
+    return 0xFF;
+  } 
+    
+  return 0;
+}
+
+// Used to space out disk writes
+long lastLogUpdate = 0;
+
 void loop() {
   readTempSensors();
   readVoltSensors();
+
+  display.setGet8PixelsUnbuffered(getGraphPixels);
   
-  // Write to disk
-  if ((millis() / 1000l) % 5 == 0 ) {
+  long time = millis();
+  if (time - DISK_WRITE_INTERVAL_MS > lastLogUpdate) {
+    lastLogUpdate = time;
+    
+    // Write to disk
     logData(sensorVoltOne, sensorTempOneC, sensorTempTwoC);
     showMem();    
   }
 
   // Update the boost info
   updateBoostDuration();
+  
 
   display.clearDisplay();
 
