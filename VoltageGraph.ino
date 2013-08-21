@@ -10,8 +10,10 @@ void setupBarGraph() {
 
 void addBarGraphDataPoint(int value) {
   barGraphIndex += 1;
-  if (barGraphIndex > BARGRAPH_DATA_SZ){
+  if (barGraphIndex >= BARGRAPH_DATA_SZ){
     barGraphIndex = 0;
+    Serial.print(F("Bazinga::"));
+    Serial.println(value);
   }
 
   // From 16 V to 28 V, scaled

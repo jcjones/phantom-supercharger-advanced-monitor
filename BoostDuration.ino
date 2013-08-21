@@ -1,21 +1,20 @@
 #include "Globals.h"
 
 
-static long lastBoostStartMs = 0;
-static long lastBoostEndMs = 0;
+static long lastBoostMs = 0;
 static long thisBoostStartMs = 0;
 static boolean boosting = false;
 
 int getLastBoostDurationMillis() {
-  if ((0 == lastBoostStartMs) || (0 == lastBoostEndMs)) {
-    return 0;
-  }
-  
-  return lastBoostEndMs - lastBoostStartMs;
+  return lastBoostMs;
+}
+
+inline float getdVdT() {
+  return (float)(getBarGraphDataPointInPast(0) - getBarGraphDataPointInPast(4)) / (CYCLE_DELAY * 5.0); // 5 ticks total
 }
 
 int updateBoostDuration() {
-  float dxdt = (float)(getBarGraphDataPointInPast(0) - getBarGraphDataPointInPast(2)) / (CYCLE_DELAY * 3.0); // 3 ticks total
+  float dvdt = getdVdT();
   
 //  Serial.print("Boost ");
 //  Serial.print(dxdt,2);
@@ -23,10 +22,9 @@ int updateBoostDuration() {
 //  Serial.print(boosting?"t":"f");
 //  Serial.println("");
   
-  if (dxdt >= 0.0) {
+  if (dvdt >= 0.0) {
     if (boosting) {
-      lastBoostStartMs = thisBoostStartMs;
-      lastBoostEndMs = millis();
+      lastBoostMs = millis() - thisBoostStartMs;
       boosting = false;
     }
   } else {

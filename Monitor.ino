@@ -1,6 +1,5 @@
 //#include <OneWire.h>
 
-#include <RunningAverage.h>
 #include <MemoryFree.h>
 #include "Globals.h"
 #include "U8glib.h"
@@ -48,8 +47,6 @@ U8GLIB_SSD1306_128X64 u8g(OLED_CLK, OLED_MOSI, OLED_CS, OLED_DC, OLED_RESET); //
 
 float sensorTempOneC;
 float sensorTempTwoC;
-RunningAverage sensorTempOneI(3);
-RunningAverage sensorTempTwoI(3);
 
 float sensorVoltOne;
 int sensorVoltOneI;
@@ -74,16 +71,16 @@ void changeState(int newState) {
 void readTempSensors()
 {
   analogRead(TEMP_ONE); // Discard the first read
-  sensorTempOneI.addValue(analogRead(TEMP_ONE));
+  int sensorTempOneI = analogRead(TEMP_ONE);
   
-  float sensorTempOneV = sensorTempOneI.getAverage() * AREF_VOLTAGE;
+  float sensorTempOneV = sensorTempOneI * AREF_VOLTAGE;
   sensorTempOneV /= 1024.0;
   sensorTempOneC = (sensorTempOneV - 0.5) * 100;
 
   analogRead(TEMP_TWO); // Discard the first read
-  sensorTempTwoI.addValue(analogRead(TEMP_TWO));
+  int sensorTempTwoI = analogRead(TEMP_TWO);
   
-  float sensorTempTwoV = sensorTempTwoI.getAverage() * AREF_VOLTAGE;
+  float sensorTempTwoV = sensorTempTwoI * AREF_VOLTAGE;
   sensorTempTwoV /= 1024.0;
   sensorTempTwoC = (sensorTempTwoV - 0.5) * 100;  
 //  
@@ -150,29 +147,34 @@ void draw() {
       u8g.setColorIndex(1);
       u8g.setFont(u8g_font_6x10r);
       u8g.drawFrame(0, 0, DISPLAY_WIDTH, 34);
-      u8g.drawStr( 38, 12, F("Notice:"));
+      u8g.drawStr( 40, 12, F("Notice:"));
       u8g.drawStr( 6, 24, onscreenNoticeMessage);
       break;
     case STATE_SPLASH:
       u8g.setColorIndex(1);
       u8g.setFont(u8g_font_fur11r);
-      u8g.drawStr( 26, 24, F("PHANTOM"));
-      u8g.drawStr( 30, 36, F("ELECTRIC"));
-      u8g.drawStr( 3, 48, F("SUPERCHARGERS"));      
+      u8g.drawStr( 26, 14, F("PHANTOM"));
+      u8g.drawStr( 6, 38, F("FULL-THROTTLE"));
+      u8g.drawStr( 6, 62,  F("SUPERCHARGER"));      
       break;
     case STATE_NORMAL:
       u8g.setColorIndex(1);
       u8g.setFont(u8g_font_6x10r);
-      u8g.setPrintPos(2, 12);
+      u8g.setPrintPos(2, 10);
       u8g.print(F("ESC "));
       u8g.print(sensorTempOneC, 1);
-      u8g.print(F("C  CPU "));
+      u8g.print(F("C   CPU "));
       u8g.print(sensorTempTwoC, 1);
-      u8g.print(F(" C"));
-      u8g.setPrintPos(12, 24);      
-      u8g.print(F("Last Boost: "));
-      u8g.print(getLastBoostDurationMillis()/1000.0, 2);
-      u8g.print(F(" s"));
+      u8g.print(F("C"));
+      if (isBoosting()) {
+        u8g.setPrintPos(40, 20);
+        u8g.print(F("Boosting"));
+      } else { 
+        u8g.setPrintPos(10, 20);     
+        u8g.print(F("Last Boost: "));
+        u8g.print(getLastBoostDurationMillis()/1000.0, 2);
+        u8g.print(F(" s"));
+      }
       
       for(int i=0; i<BARGRAPH_DATA_SZ; i++) {
         int h = getBarGraphDataPointInPast(i);
@@ -199,7 +201,7 @@ void draw() {
 
 
 void setup()   {       
-  Serial.begin(9600);
+//  Serial.begin(9600);
   analogReference(EXTERNAL);
   
   u8g.setHardwareBackup(u8g_backup_avr_spi);
