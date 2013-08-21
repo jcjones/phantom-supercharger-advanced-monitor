@@ -1,4 +1,4 @@
-#include <OneWire.h>
+//#include <OneWire.h>
 
 #include <RunningAverage.h>
 #include <MemoryFree.h>
@@ -25,7 +25,7 @@ from pins_arduino.h:
 #define OLED_CS 8
 #define OLED_RESET 7
 
-OneWire  ds(2);
+//OneWire  ds(2);
 
 /*
 5V Brown
@@ -55,10 +55,10 @@ float sensorVoltOne;
 int sensorVoltOneI;
 
 // Used by the Fatal state
-char fatalErrorMessage[33];
+char onscreenNoticeMessage[33];
 
 #define STATE_SPLASH 0
-#define STATE_ERROR 8
+#define STATE_NOTICE 8
 #define STATE_FATAL 9
 #define STATE_NORMAL 1
 int displayState;
@@ -109,7 +109,8 @@ void readVoltSensors()
   sensorVoltOneI = analogRead(VOLT_ONE);
 
   // fake it
-  sensorVoltOneI = constrain((millis()/10)%1023, 440, 1023); // fake fake TODO
+//  sensorVoltOneI = constrain((millis()/10)%1023, 440, 1023); // fake fake TODO
+  sensorVoltOneI = (int)(292.0*sin(millis()/5000.0)+732.0);
 
   sensorVoltOne = sensorVoltOneI * (28.0 / 1024.0);
 
@@ -122,36 +123,41 @@ void showMem() {
 }
 
 void showFatal(const char* buf){
-  fatalErrorMessage[0] = '\0';
-  strncpy(fatalErrorMessage, buf, sizeof(fatalErrorMessage));
+  onscreenNoticeMessage[0] = '\0';
+  strncpy(onscreenNoticeMessage, buf, sizeof(onscreenNoticeMessage));
   Serial.print(F("FATAL ERROR:"));
-  Serial.println(fatalErrorMessage);
+  Serial.println(onscreenNoticeMessage);
   changeState(STATE_FATAL);
 }
 
-void showError(const char* buf){
-  fatalErrorMessage[0] = '\0';
-  strncpy(fatalErrorMessage, buf, sizeof(fatalErrorMessage));
-  Serial.print(F("FATAL ERROR:"));
-  Serial.println(fatalErrorMessage);
-  changeState(STATE_ERROR);
+void showNotice(const char* buf){
+  onscreenNoticeMessage[0] = '\0';
+  strncpy(onscreenNoticeMessage, buf, sizeof(onscreenNoticeMessage));
+  Serial.println(onscreenNoticeMessage);
+  changeState(STATE_NOTICE);
 }
 
 void draw() {
   switch (displayState) {
     case STATE_FATAL:
-    case STATE_ERROR:
       u8g.setColorIndex(1);
       u8g.setFont(u8g_font_6x10r);
       u8g.drawFrame(0, 0, DISPLAY_WIDTH, 34);
       u8g.drawStr( 28, 12, F("Fatal Error:"));
-      u8g.drawStr( 6, 24, fatalErrorMessage);
+      u8g.drawStr( 6, 24, onscreenNoticeMessage);
+      break;
+    case STATE_NOTICE:
+      u8g.setColorIndex(1);
+      u8g.setFont(u8g_font_6x10r);
+      u8g.drawFrame(0, 0, DISPLAY_WIDTH, 34);
+      u8g.drawStr( 38, 12, F("Notice:"));
+      u8g.drawStr( 6, 24, onscreenNoticeMessage);
       break;
     case STATE_SPLASH:
       u8g.setColorIndex(1);
       u8g.setFont(u8g_font_fur11r);
-      u8g.drawStr( 27, 24, F("PHANTOM"));
-      u8g.drawStr( 26, 36, F("ELECTRIC"));
+      u8g.drawStr( 26, 24, F("PHANTOM"));
+      u8g.drawStr( 30, 36, F("ELECTRIC"));
       u8g.drawStr( 3, 48, F("SUPERCHARGERS"));      
       break;
     case STATE_NORMAL:
@@ -178,10 +184,10 @@ void draw() {
       
 
       u8g.setColorIndex(0);
-      u8g.drawRBox(30, 36, 72, 30, 2);
+      u8g.drawRBox(30, 36, 72, 28, 2);
 
       u8g.setColorIndex(1);
-      u8g.drawRFrame(30, 36, 72, 30, 2);      
+      u8g.drawRFrame(30, 36, 72, 28, 2);      
 
       u8g.setFont(u8g_font_helvB24n);
       u8g.setPrintPos(34, 63);
@@ -256,7 +262,7 @@ void loop() {
         // Hold here forever
       }
       break;
-    case STATE_ERROR:
+    case STATE_NOTICE:
       changeState(STATE_NORMAL);
       delay(4000);      
       break;

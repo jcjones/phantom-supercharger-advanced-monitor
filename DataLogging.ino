@@ -64,7 +64,7 @@ void DataLogging_Begin(int pin_cs, int pin_mosi, int pin_miso, int pin_clk) {
 
   // see if the card is present and can be initialized:
   if (!SD.begin(pin_cs, pin_mosi, pin_miso, pin_clk)) {
-    showError("SD Card Not Present");
+    showNotice("SD Card Not Present");
     return;
   }
 
@@ -83,8 +83,10 @@ void DataLogging_Begin(int pin_cs, int pin_mosi, int pin_miso, int pin_clk) {
     dataFile.println(F("timeMs,voltage,tempOneC,tempTwoC"));
     dataFile.flush();
     
+    showNotice("Logging to SD card");
+    
   } else {
-    showError("Error opening log.");
+    showNotice("Error opening log");
     return;
   }
 }
