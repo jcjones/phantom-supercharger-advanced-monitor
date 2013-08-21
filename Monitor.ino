@@ -1,3 +1,5 @@
+#include <OneWire.h>
+
 #include <RunningAverage.h>
 #include <MemoryFree.h>
 #include "Globals.h"
@@ -22,6 +24,8 @@ from pins_arduino.h:
 #define OLED_DC 9
 #define OLED_CS 8
 #define OLED_RESET 7
+
+OneWire  ds(2);
 
 /*
 5V Brown
@@ -138,21 +142,21 @@ void draw() {
     case STATE_FATAL:
     case STATE_ERROR:
       u8g.setColorIndex(1);
-      u8g.setFont(u8g_font_6x10);
+      u8g.setFont(u8g_font_6x10r);
       u8g.drawFrame(0, 0, DISPLAY_WIDTH, 34);
       u8g.drawStr( 28, 12, F("Fatal Error:"));
       u8g.drawStr( 6, 24, fatalErrorMessage);
       break;
     case STATE_SPLASH:
       u8g.setColorIndex(1);
-      u8g.setFont(u8g_font_6x10);
-      u8g.drawStr( 28, 12, F("PHANTOM"));
-      u8g.drawStr( 24, 24, F("ELECTRIC"));
-      u8g.drawStr( 3, 36, F("SUPERCHARGERS"));      
+      u8g.setFont(u8g_font_fur11r);
+      u8g.drawStr( 27, 24, F("PHANTOM"));
+      u8g.drawStr( 26, 36, F("ELECTRIC"));
+      u8g.drawStr( 3, 48, F("SUPERCHARGERS"));      
       break;
     case STATE_NORMAL:
       u8g.setColorIndex(1);
-      u8g.setFont(u8g_font_6x10);
+      u8g.setFont(u8g_font_6x10r);
       u8g.setPrintPos(2, 12);
       u8g.print(F("ESC "));
       u8g.print(sensorTempOneC, 1);
@@ -168,23 +172,21 @@ void draw() {
         int h = getBarGraphDataPointInPast(i);
         int x = i*2;
         int yStart = DISPLAY_HEIGHT - h;
-//        if (yStart < 40) {
-//          Serial.print("yStart h: ");
-//          Serial.print(h);
-//          Serial.print(" i was: ");
-//          Serial.println(i);
-//        }
         u8g.drawVLine(DISPLAY_WIDTH-x, yStart, h);
         u8g.drawVLine(DISPLAY_WIDTH-x+1, yStart, h);        
       }
       
+
       u8g.setColorIndex(0);
-      u8g.drawRBox(48, 36, 38, 12, 2);
+      u8g.drawRBox(30, 36, 72, 30, 2);
+
       u8g.setColorIndex(1);
-      u8g.setPrintPos(50, 45);
-      u8g.print(sensorVoltOne, 1);
-      u8g.print(F(" V"));
+      u8g.drawRFrame(30, 36, 72, 30, 2);      
+
+      u8g.setFont(u8g_font_helvB24n);
+      u8g.setPrintPos(34, 63);
       
+      u8g.print(sensorVoltOne, 1);
       break;   
   }
 }
@@ -201,8 +203,6 @@ void setup()   {
   
   changeState(STATE_SPLASH);
 
-  showMem();
-
   // Setup bar graph
   setupBarGraph();
 
@@ -211,12 +211,18 @@ void setup()   {
 
 // Used to space out disk writes
 long lastLogUpdate = 0;
+long lastTempUpdate = 0;
 
 void loopNormal() {
-  readTempSensors();
   readVoltSensors();
   
   long time = millis();
+  
+  if (time - TEMP_READ_INTERVAL_MS > lastTempUpdate) {
+    lastTempUpdate = time;
+    readTempSensors();
+  }
+  
   if (time - DISK_WRITE_INTERVAL_MS > lastLogUpdate) {
     lastLogUpdate = time;
     
@@ -237,7 +243,7 @@ void loop() {
     draw();
   } while( u8g.nextPage() );
   
-  // State transitions
+  // State updates
   switch(displayState){
     case STATE_SPLASH:
       changeState(STATE_NORMAL);
@@ -247,7 +253,7 @@ void loop() {
       break;
     case STATE_FATAL:
       while(1) {
-        // Forever
+        // Hold here forever
       }
       break;
     case STATE_ERROR:

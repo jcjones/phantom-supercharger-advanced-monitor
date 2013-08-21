@@ -13,5 +13,6 @@
 
 #define CYCLE_DELAY 100
 #define DISK_WRITE_INTERVAL_MS 1000
+#define TEMP_READ_INTERVAL_MS 1000
 
 #endif // Globals_h
