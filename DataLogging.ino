@@ -80,7 +80,7 @@ void DataLogging_Begin(int pin_cs, int pin_mosi, int pin_miso, int pin_clk) {
     Serial.println(buffer);
     
     // Print CSV header
-    dataFile.println(F("timeMs,voltage,tempOneC,tempTwoC"));
+    dataFile.println(F("timeMs,voltage,motorTempC,controllerTempC"));
     dataFile.flush();
     
     showNotice("Logging to SD card");

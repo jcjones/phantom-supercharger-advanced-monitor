@@ -1,5 +1,4 @@
-//#include <OneWire.h>
-
+#include <OneWire.h>
 #include <MemoryFree.h>
 #include "Globals.h"
 #include "U8glib.h"
@@ -24,30 +23,29 @@ from pins_arduino.h:
 #define OLED_CS 8
 #define OLED_RESET 7
 
-//OneWire  ds(2);
+OneWire  oneWire(2);
+
+byte controllerThermometer[] = { 0x28, 0xF1, 0x14, 0xB3, 0x04, 0x00, 0x00, 0xBF };
+byte motorThermometer[] = { 0x28, 0x0D, 0xDE, 0xB2, 0x04, 0x00, 0x00, 0xA0 };
 
 /*
 5V Brown
 Gnd S-Blue
-Data S-Brown 11
+Data Orange 11
 Clk Blue 13
 DC Green 9
 Rest S-Green 7
-CS Orange 8
+CS S-Brown 8
 NC S-Orange
 */
 
-
 #define VOLT_ONE A3
-#define TEMP_ONE A0
-#define TEMP_TWO A1
-#define AREF_VOLTAGE 3.3
+#define AREF_VOLTAGE 5.0
 
 U8GLIB_SSD1306_128X64 u8g(OLED_CLK, OLED_MOSI, OLED_CS, OLED_DC, OLED_RESET); // HW SPI Com: CS = 10, A0 = 9 (Hardware Pins are  SCK = 13 and MOSI = 11)
 
-float sensorTempOneC;
-float sensorTempTwoC;
-
+float controllerTempC;
+float motorTempC;
 float sensorVoltOne;
 int sensorVoltOneI;
 
@@ -68,36 +66,81 @@ void changeState(int newState) {
   displayState = newState;
 }
 
+float readTemp(byte *addr) {
+  byte scratchPad[9];
+  byte crc;
+  byte i;
+  
+  oneWire.reset();
+  oneWire.skip();
+  oneWire.write(STARTCONVO, 0);
+  delay(ONEWIRE_POWERED_POLLTIME_MS);
+  
+  oneWire.reset();
+  oneWire.select(addr);
+  oneWire.write(READSCRATCH);
+  // read the response
+
+  // byte 0: temperature LSB
+  scratchPad[TEMP_LSB] = oneWire.read();
+
+  // byte 1: temperature MSB
+  scratchPad[TEMP_MSB] = oneWire.read();
+
+  // byte 2: high alarm temp
+  scratchPad[HIGH_ALARM_TEMP] = oneWire.read();
+
+  // byte 3: low alarm temp
+  scratchPad[LOW_ALARM_TEMP] = oneWire.read();
+
+  // byte 4:
+  // DS18S20: store for crc
+  // DS18B20 & DS1822: configuration register
+  scratchPad[CONFIGURATION] = oneWire.read();
+
+  // byte 5:
+  // internal use & crc
+  scratchPad[INTERNAL_BYTE] = oneWire.read();
+
+  // byte 6:
+  // DS18S20: COUNT_REMAIN
+  // DS18B20 & DS1822: store for crc
+  scratchPad[COUNT_REMAIN] = oneWire.read();
+
+  // byte 7:
+  // DS18S20: COUNT_PER_C
+  // DS18B20 & DS1822: store for crc
+  scratchPad[COUNT_PER_C] = oneWire.read();
+
+  // byte 8:
+  // SCTRACHPAD_CRC
+  scratchPad[SCRATCHPAD_CRC] = oneWire.read();
+
+  oneWire.reset();
+  
+  crc = OneWire::crc8(scratchPad, 8);
+  if (crc != scratchPad[8]) {
+    return 0.0;
+  }
+  
+  int16_t raw = (scratchPad[TEMP_MSB] << 8) | scratchPad[TEMP_LSB];
+
+  byte cfg = (scratchPad[4] & 0x60);
+  // at lower res, the low bits are undefined, so let's zero them
+  if (cfg == 0x00) raw = raw & ~7;  // 9 bit resolution, 93.75 ms
+  else if (cfg == 0x20) raw = raw & ~3; // 10 bit res, 187.5 ms
+  else if (cfg == 0x40) raw = raw & ~1; // 11 bit res, 375 ms
+  
+  return (float) raw / 16.0;
+}
+
 void readTempSensors()
 {
-  analogRead(TEMP_ONE); // Discard the first read
-  int sensorTempOneI = analogRead(TEMP_ONE);
-  
-  float sensorTempOneV = sensorTempOneI * AREF_VOLTAGE;
-  sensorTempOneV /= 1024.0;
-  sensorTempOneC = (sensorTempOneV - 0.5) * 100;
-
-  analogRead(TEMP_TWO); // Discard the first read
-  int sensorTempTwoI = analogRead(TEMP_TWO);
-  
-  float sensorTempTwoV = sensorTempTwoI * AREF_VOLTAGE;
-  sensorTempTwoV /= 1024.0;
-  sensorTempTwoC = (sensorTempTwoV - 0.5) * 100;  
-//  
-//  Serial.print(F("1:"));  
-//  Serial.print(sensorTempOneI.getAverage(), 2);  
-//  Serial.print(" V ");
-//  Serial.print(sensorTempOneV, 2);
-//  Serial.print(" C ");
-//  Serial.print(sensorTempOneC, 2);
-//
-//  Serial.print(F("    2:"));
-//  Serial.print(sensorTempTwoI.getAverage(), 2);  
-//  Serial.print(" V ");
-//  Serial.print(sensorTempTwoV, 2);
-//  Serial.print(" C ");
-//  Serial.println(sensorTempTwoC, 2);
-  
+  controllerTempC = readTemp(controllerThermometer);
+  motorTempC = readTemp(motorThermometer);
+  Serial.print(controllerTempC, 2);
+  Serial.print("   MOT ");
+  Serial.println(motorTempC, 2);
 }
 
 void readVoltSensors()
@@ -109,7 +152,7 @@ void readVoltSensors()
 //  sensorVoltOneI = constrain((millis()/10)%1023, 440, 1023); // fake fake TODO
   sensorVoltOneI = (int)(292.0*sin(millis()/5000.0)+732.0);
 
-  sensorVoltOne = sensorVoltOneI * (28.0 / 1024.0);
+  sensorVoltOne = sensorVoltOneI * (30.0 / 1024.0);
 
   addBarGraphDataPoint(sensorVoltOneI);
 }
@@ -140,7 +183,7 @@ void draw() {
       u8g.setColorIndex(1);
       u8g.setFont(u8g_font_6x10r);
       u8g.drawFrame(0, 0, DISPLAY_WIDTH, 34);
-      u8g.drawStr( 28, 12, F("Fatal Error:"));
+      u8g.drawStr( 28, 12, F("FATAL ERROR:"));
       u8g.drawStr( 6, 24, onscreenNoticeMessage);
       break;
     case STATE_NOTICE:
@@ -152,7 +195,7 @@ void draw() {
       break;
     case STATE_SPLASH:
       u8g.setColorIndex(1);
-      u8g.setFont(u8g_font_fur11r);
+      u8g.setFont(u8g_font_6x10r);
       u8g.drawStr( 26, 14, F("PHANTOM"));
       u8g.drawStr( 6, 38, F("FULL-THROTTLE"));
       u8g.drawStr( 6, 62,  F("SUPERCHARGER"));      
@@ -161,10 +204,10 @@ void draw() {
       u8g.setColorIndex(1);
       u8g.setFont(u8g_font_6x10r);
       u8g.setPrintPos(2, 10);
-      u8g.print(F("ESC "));
-      u8g.print(sensorTempOneC, 1);
+      u8g.print(F("MOT "));
+      u8g.print(motorTempC, 1);
       u8g.print(F("C   CPU "));
-      u8g.print(sensorTempTwoC, 1);
+      u8g.print(controllerTempC, 1);
       u8g.print(F("C"));
       if (isBoosting()) {
         u8g.setPrintPos(40, 20);
@@ -192,22 +235,26 @@ void draw() {
       u8g.drawRFrame(30, 36, 72, 28, 2);      
 
       u8g.setFont(u8g_font_helvB24n);
-      u8g.setPrintPos(34, 63);
-      
+      u8g.setPrintPos(34, 63);      
       u8g.print(sensorVoltOne, 1);
+      
       break;   
   }
 }
 
 
 void setup()   {       
-//  Serial.begin(9600);
-  analogReference(EXTERNAL);
+  Serial.begin(9600);
   
   u8g.setHardwareBackup(u8g_backup_avr_spi);
   
   pinMode(SD_CS, OUTPUT);
   pinMode(OLED_CS, OUTPUT);
+  
+ 
+//  if ( !sensors.getAddress(controllerThermometer, 0) || !sensors.getAddress(motorThermometer, 1) ) {
+//    showNotice("Both temp probes are not connected.");
+//  }
   
   changeState(STATE_SPLASH);
 
@@ -235,7 +282,7 @@ void loopNormal() {
     lastLogUpdate = time;
     
     // Write to disk
-    logData(sensorVoltOne, sensorTempOneC, sensorTempTwoC);
+    logData(sensorVoltOne, motorTempC, controllerTempC);
     showMem();    
   }
 

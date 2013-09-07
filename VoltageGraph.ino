@@ -16,7 +16,7 @@ void addBarGraphDataPoint(int value) {
     Serial.println(value);
   }
 
-  // From 16 V to 28 V, scaled
+  // From 16 V to 28.5 V, scaled
   value = constrain(value, 440, 1023);  
   barGraphData[barGraphIndex] = map(value, 440, 1023, 0, GRAPH_HEIGHT);
 }
