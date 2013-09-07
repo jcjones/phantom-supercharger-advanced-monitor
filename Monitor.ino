@@ -3,6 +3,39 @@
 #include "Globals.h"
 #include "U8glib.h"
 
+
+/* Analog */
+#define VOLT_ONE A3
+#define AREF_VOLTAGE 5.0
+
+/* Digital */
+#define BUTTON 2
+#define ONEWIRE 3
+
+
+/* Hardware SPI */
+#define SD_CLK SCK
+#define SD_MISO MISO
+#define SD_MOSI MOSI
+#define SD_CS SS
+     
+/* Software SPI */
+#define OLED_CLK SCK
+#define OLED_MOSI MOSI
+#define OLED_DC 9
+#define OLED_CS 8
+#define OLED_RESET 7
+
+OneWire  oneWire(ONEWIRE);
+
+/* Addresses for the 1-wire temperature probes */
+byte controllerThermometer[] = { 0x28, 0xF1, 0x14, 0xB3, 0x04, 0x00, 0x00, 0xBF };
+byte motorThermometer[] = { 0x28, 0x0D, 0xDE, 0xB2, 0x04, 0x00, 0x00, 0xA0 };
+
+/* Used to space out periodic tasks */
+long lastLogUpdate = 0;
+long lastTempUpdate = 0;
+
 /*
 from pins_arduino.h:
  const static uint8_t SS = 10;
@@ -10,38 +43,23 @@ from pins_arduino.h:
  const static uint8_t MISO = 12;
  const static uint8_t SCK  = 13;
  */
-
-#define SD_CLK SCK
-#define SD_MISO MISO
-#define SD_MOSI MOSI
-#define SD_CS SS
-     
-/* Use for combination with SD card */
-#define OLED_CLK SCK
-#define OLED_MOSI MOSI
-#define OLED_DC 9
-#define OLED_CS 8
-#define OLED_RESET 7
-
-OneWire  oneWire(2);
-
-byte controllerThermometer[] = { 0x28, 0xF1, 0x14, 0xB3, 0x04, 0x00, 0x00, 0xBF };
-byte motorThermometer[] = { 0x28, 0x0D, 0xDE, 0xB2, 0x04, 0x00, 0x00, 0xA0 };
-
+ 
 /*
-5V Brown
-Gnd S-Blue
-Data Orange 11
-Clk Blue 13
-DC Green 9
-Rest S-Green 7
-CS S-Brown 8
-NC S-Orange
+Conversion Table
+------------------------------------
+SPI | Cat5 wire colors | Digital Pin
+------------------------------------
+5V  | Brown            | -
+Gnd | S-Blue           | -
+Data| Orange           | 11
+Clk | Blue             | 13
+DC  | Green            | 9
+Rest| S-Green          | 7
+CS  | S-Brown          | 8
+NC  | S-Orange         | NC (button)
 */
 
-#define VOLT_ONE A3
-#define AREF_VOLTAGE 5.0
-
+/* Screen */
 U8GLIB_SSD1306_128X64 u8g(OLED_CLK, OLED_MOSI, OLED_CS, OLED_DC, OLED_RESET); // HW SPI Com: CS = 10, A0 = 9 (Hardware Pins are  SCK = 13 and MOSI = 11)
 
 float controllerTempC;
@@ -58,6 +76,7 @@ char onscreenNoticeMessage[33];
 #define STATE_NORMAL 1
 int displayState;
 
+/* State change function */
 void changeState(int newState) {
   Serial.print(F("S_OLD: "));
   Serial.print(displayState);  
@@ -66,15 +85,19 @@ void changeState(int newState) {
   displayState = newState;
 }
 
+/* Tell the probes to sample the temperature and store it in their EEPROM */
+void requestTemps() {
+  oneWire.reset();
+  oneWire.skip();
+  oneWire.write(STARTCONVO, 0);
+}
+
+
+/* Read the EEPROM of one of the probes, identified by the address */
 float readTemp(byte *addr) {
   byte scratchPad[9];
   byte crc;
   byte i;
-  
-  oneWire.reset();
-  oneWire.skip();
-  oneWire.write(STARTCONVO, 0);
-  delay(ONEWIRE_POWERED_POLLTIME_MS);
   
   oneWire.reset();
   oneWire.select(addr);
@@ -134,15 +157,14 @@ float readTemp(byte *addr) {
   return (float) raw / 16.0;
 }
 
+/* Read all temperature probes and fill in the global variables */
 void readTempSensors()
 {
   controllerTempC = readTemp(controllerThermometer);
   motorTempC = readTemp(motorThermometer);
-  Serial.print(controllerTempC, 2);
-  Serial.print("   MOT ");
-  Serial.println(motorTempC, 2);
 }
 
+/* Read all the voltage sensors and fill in the global variables */
 void readVoltSensors()
 {  
   analogRead(VOLT_ONE); // Discard the first read
@@ -157,11 +179,7 @@ void readVoltSensors()
   addBarGraphDataPoint(sensorVoltOneI);
 }
 
-void showMem() {
-  Serial.print(F("Free RAM ="));
-  Serial.println(freeMemory());
-}
-
+/* Show an error and stop */
 void showFatal(const char* buf){
   onscreenNoticeMessage[0] = '\0';
   strncpy(onscreenNoticeMessage, buf, sizeof(onscreenNoticeMessage));
@@ -170,6 +188,7 @@ void showFatal(const char* buf){
   changeState(STATE_FATAL);
 }
 
+/* Show a notice and continue */
 void showNotice(const char* buf){
   onscreenNoticeMessage[0] = '\0';
   strncpy(onscreenNoticeMessage, buf, sizeof(onscreenNoticeMessage));
@@ -177,6 +196,7 @@ void showNotice(const char* buf){
   changeState(STATE_NOTICE);
 }
 
+/* Operate the OLED display */
 void draw() {
   switch (displayState) {
     case STATE_FATAL:
@@ -251,22 +271,11 @@ void setup()   {
   pinMode(SD_CS, OUTPUT);
   pinMode(OLED_CS, OUTPUT);
   
- 
-//  if ( !sensors.getAddress(controllerThermometer, 0) || !sensors.getAddress(motorThermometer, 1) ) {
-//    showNotice("Both temp probes are not connected.");
-//  }
-  
   changeState(STATE_SPLASH);
 
   // Setup bar graph
   setupBarGraph();
-
-  showMem();
 }
-
-// Used to space out disk writes
-long lastLogUpdate = 0;
-long lastTempUpdate = 0;
 
 void loopNormal() {
   readVoltSensors();
@@ -275,15 +284,22 @@ void loopNormal() {
   
   if (time - TEMP_READ_INTERVAL_MS > lastTempUpdate) {
     lastTempUpdate = time;
+    /* Read the most recent values */
     readTempSensors();
+    /* Let them process in the background */
+    requestTemps();
   }
   
   if (time - DISK_WRITE_INTERVAL_MS > lastLogUpdate) {
     lastLogUpdate = time;
     
-    // Write to disk
+    /* Write to disk */
     logData(sensorVoltOne, motorTempC, controllerTempC);
-    showMem();    
+
+    /* Debugging */
+    Serial.print(F("Free RAM ="));
+    Serial.println(freeMemory());
+
   }
 
   // Update the boost info
@@ -292,19 +308,27 @@ void loopNormal() {
 
 void loop() {
   
-  // Draw
+  /* Draw */
   u8g.firstPage();  
   do {
     draw();
   } while( u8g.nextPage() );
   
-  // State updates
+  /* State updates */
   switch(displayState){
     case STATE_SPLASH:
+      /* Move to Normal. */
       changeState(STATE_NORMAL);
-      // Initialize the data logger
+      
+      /* Initialize the data logger */
       DataLogging_Begin(SD_CS, SD_MOSI, SD_MISO, SD_CLK);
+      
+      /* Request the first temperatures */
+      requestTemps();
+      
+      /* Remain in splash for 2 seconds */
       delay(2000);
+      
       break;
     case STATE_FATAL:
       while(1) {
@@ -312,8 +336,12 @@ void loop() {
       }
       break;
     case STATE_NOTICE:
+      /* Return to Normal. */
       changeState(STATE_NORMAL);
+      
+      /* Show notices for 4 seconds */
       delay(4000);      
+      
       break;
     case STATE_NORMAL:
       loopNormal();    
