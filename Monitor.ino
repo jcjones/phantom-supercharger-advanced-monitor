@@ -11,7 +11,7 @@
 /* Digital */
 #define BUTTON 2
 #define ONEWIRE 3
-
+#define RELAY 4
 
 /* Hardware SPI */
 #define SD_CLK SCK
@@ -58,7 +58,7 @@ Clk | Blue             | 13
 DC  | Green            | 9
 Rest| S-Green          | 7
 CS  | S-Brown          | 8
-NC  | S-Orange         | NC (button)
+Butt| S-Orange         | 2 (button)
 */
 
 /* Screen */
@@ -68,6 +68,9 @@ float controllerTempC;
 float motorTempC;
 float sensorVoltOne;
 int sensorVoltOneI;
+
+boolean relayEnabled = false;
+int lastButtonState = LOW;
 
 
 // Used by the Fatal state
@@ -199,6 +202,39 @@ void readVoltSensors()
   addBarGraphDataPoint(sensorVoltOneI);
 }
 
+/* Only trigger on a state change to HIGH */
+boolean readButtonState() {
+  boolean result = false;
+  int buttonState = digitalRead(BUTTON);
+  
+  if (HIGH == buttonState && LOW == lastButtonState) {
+    result = true;
+  }
+  
+  lastButtonState = buttonState;
+  
+  return result;
+}
+
+/* Change the relay enabled state */
+void changeRelayEnabledState(boolean newState) {
+  relayEnabled = newState;
+  
+  if (relayEnabled) {
+    Serial.println(F("Relay enabled"));
+    digitalWrite(RELAY, HIGH);
+  } else {
+    Serial.println(F("Relay disabled"));
+    digitalWrite(RELAY, LOW);
+  }  
+}
+
+/* Helper Function to toggle based on the state variable */
+void toggleRelayEnabledState() {
+  changeRelayEnabledState( !relayEnabled );
+}
+
+
 /* Show an error and stop */
 void showFatal(const char* buf){
   onscreenNoticeMessage[0] = '\0';
@@ -216,6 +252,7 @@ void showNotice(const char* buf){
   changeState(STATE_NOTICE);
 }
 
+
 /* Operate the OLED display */
 void draw() {
   switch (displayState) {
@@ -229,16 +266,17 @@ void draw() {
     case STATE_NOTICE:
       u8g.setColorIndex(1);
       u8g.setFont(u8g_font_6x10r);
-      u8g.drawFrame(0, 0, DISPLAY_WIDTH, 34);
-      u8g.drawStr( 40, 12, F("Notice:"));
+      u8g.drawFrame(0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT);
+      u8g.drawStr( 41, 12, F("Notice:"));
       u8g.drawStr( 6, 24, onscreenNoticeMessage);
+      u8g.drawStr( 26, 61, F("Press button."));      
       break;
     case STATE_SPLASH:
       u8g.setColorIndex(1);
       u8g.setFont(u8g_font_6x10r);
-      u8g.drawStr( 36, 26, F("PHANTOM"));
-      u8g.drawStr( 16, 38, F("FULL-THROTTLE"));
-      u8g.drawStr( 16, 50,  F("SUPERCHARGER"));
+      u8g.drawStr( 27, 22, F("   PHANTOM   "));
+      u8g.drawStr( 27, 34, F("FULL-THROTTLE"));
+      u8g.drawStr( 29, 46,  F("SUPERCHARGER"));
       break;
     case STATE_NORMAL:
       u8g.setColorIndex(1);
@@ -249,34 +287,43 @@ void draw() {
       u8g.print(F("C   CPU "));
       u8g.print(controllerTempC, 1);
       u8g.print(F("C"));
-      if (isBoosting()) {
-        u8g.setPrintPos(40, 20);
-        u8g.print(F("Boosting"));
+      
+      if (relayEnabled) {
+      
+        if (isBoosting()) {
+          u8g.setPrintPos(40, 20);
+          u8g.print(F("Boosting"));
+        } else { 
+          u8g.setPrintPos(10, 20);     
+          u8g.print(F("Last Boost: "));
+          u8g.print(getLastBoostDurationMillis()/1000.0, 2);
+          u8g.print(F(" s"));
+        }
+        
+        for(int i=0; i<BARGRAPH_DATA_SZ; i++) {
+          int h = getBarGraphDataPointInPast(i);
+          int x = i*2;
+          int yStart = DISPLAY_HEIGHT - h;
+          u8g.drawVLine(DISPLAY_WIDTH-x, yStart, h);
+          u8g.drawVLine(DISPLAY_WIDTH-x+1, yStart, h);        
+        }
+        
+  
+        u8g.setColorIndex(0);
+        u8g.drawRBox(30, 36, 72, 28, 2);
+  
+        u8g.setColorIndex(1);
+        u8g.drawRFrame(30, 36, 72, 28, 2);      
+  
+        u8g.setFont(u8g_font_helvB24n);
+        u8g.setPrintPos(34, 63);      
+        u8g.print(sensorVoltOne, 1);
+      
       } else { 
-        u8g.setPrintPos(10, 20);     
-        u8g.print(F("Last Boost: "));
-        u8g.print(getLastBoostDurationMillis()/1000.0, 2);
-        u8g.print(F(" s"));
+        
+        u8g.setPrintPos(34, 63);
+        u8g.print(F("Disabled"));        
       }
-      
-      for(int i=0; i<BARGRAPH_DATA_SZ; i++) {
-        int h = getBarGraphDataPointInPast(i);
-        int x = i*2;
-        int yStart = DISPLAY_HEIGHT - h;
-        u8g.drawVLine(DISPLAY_WIDTH-x, yStart, h);
-        u8g.drawVLine(DISPLAY_WIDTH-x+1, yStart, h);        
-      }
-      
-
-      u8g.setColorIndex(0);
-      u8g.drawRBox(30, 36, 72, 28, 2);
-
-      u8g.setColorIndex(1);
-      u8g.drawRFrame(30, 36, 72, 28, 2);      
-
-      u8g.setFont(u8g_font_helvB24n);
-      u8g.setPrintPos(34, 63);      
-      u8g.print(sensorVoltOne, 1);
       
       break;   
   }
@@ -290,7 +337,9 @@ void setup()   {
   
   pinMode(SD_CS, OUTPUT);
   pinMode(OLED_CS, OUTPUT);
-  
+  pinMode(BUTTON, INPUT);
+   
+  changeRelayEnabledState(false);  
   changeState(STATE_SPLASH);
 
   // Setup bar graph
@@ -299,7 +348,7 @@ void setup()   {
 
 void loopNormal() {
   readVoltSensors();
-  
+    
   long time = millis();
   
   if (time - TEMP_READ_INTERVAL_MS > lastTempUpdate) {
@@ -333,7 +382,11 @@ void loop() {
   do {
     draw();
   } while( u8g.nextPage() );
+
+  /* Load button state */
+  boolean buttonPressed = readButtonState();
   
+ 
   /* State updates */
   switch(displayState){
     case STATE_SPLASH:
@@ -352,6 +405,9 @@ void loop() {
       /* Remain in splash for 2 seconds */
       delay(2000);
       
+      /* Enable relay */
+      changeRelayEnabledState(true);
+      
       break;
     case STATE_FATAL:
       while(1) {
@@ -359,14 +415,17 @@ void loop() {
       }
       break;
     case STATE_NOTICE:
-      /* Return to Normal. */
-      changeState(STATE_NORMAL);
-      
-      /* Show notices for 4 seconds */
-      delay(4000);      
+      if (buttonPressed) {
+        /* Return to Normal. */
+        changeState(STATE_NORMAL);
+      }
       
       break;
     case STATE_NORMAL:
+      if (buttonPressed) {
+        toggleRelayEnabledState();
+      }
+      
       loopNormal();    
       break;
    }
