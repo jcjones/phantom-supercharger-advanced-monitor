@@ -27,6 +27,8 @@
 #define OLED_RESET 7
 
 OneWire  oneWire(ONEWIRE);
+/* OneWire scratchpad */
+byte scratchPad[9];
 
 /* Addresses for the 1-wire temperature probes */
 byte controllerThermometer[] = { 0x28, 0xF1, 0x14, 0xB3, 0x04, 0x00, 0x00, 0xBF };
@@ -67,6 +69,7 @@ float motorTempC;
 float sensorVoltOne;
 int sensorVoltOneI;
 
+
 // Used by the Fatal state
 char onscreenNoticeMessage[33];
 
@@ -85,17 +88,34 @@ void changeState(int newState) {
   displayState = newState;
 }
 
-/* Tell the probes to sample the temperature and store it in their EEPROM */
-void requestTemps() {
+/* Set the temperature probes to high resolution */
+void configureTempResolution() {
+  scratchPad[CONFIGURATION] = TEMP_12_BIT;
+
+  oneWire.reset();
+  oneWire.skip(); 
+  oneWire.write(WRITESCRATCH);
+  
+  oneWire.write(scratchPad[HIGH_ALARM_TEMP]); // high alarm temp
+  oneWire.write(scratchPad[LOW_ALARM_TEMP]); // low alarm temp
+  oneWire.write(scratchPad[CONFIGURATION]); // configuration
+  
   oneWire.reset();
   oneWire.skip();
-  oneWire.write(STARTCONVO, 0);
+  oneWire.write(COPYSCRATCH, NOT_PARASITE);
+} 
+
+/* Tell the probes to sample the temperature and store it in their EEPROM */
+void requestTemps() {
+  
+  oneWire.reset();
+  oneWire.skip();
+  oneWire.write(STARTCONVO, NOT_PARASITE);
 }
 
 
 /* Read the EEPROM of one of the probes, identified by the address */
 float readTemp(byte *addr) {
-  byte scratchPad[9];
   byte crc;
   byte i;
   
@@ -216,9 +236,9 @@ void draw() {
     case STATE_SPLASH:
       u8g.setColorIndex(1);
       u8g.setFont(u8g_font_6x10r);
-      u8g.drawStr( 26, 14, F("PHANTOM"));
-      u8g.drawStr( 6, 38, F("FULL-THROTTLE"));
-      u8g.drawStr( 6, 62,  F("SUPERCHARGER"));      
+      u8g.drawStr( 36, 26, F("PHANTOM"));
+      u8g.drawStr( 16, 38, F("FULL-THROTTLE"));
+      u8g.drawStr( 16, 50,  F("SUPERCHARGER"));
       break;
     case STATE_NORMAL:
       u8g.setColorIndex(1);
@@ -322,6 +342,9 @@ void loop() {
       
       /* Initialize the data logger */
       DataLogging_Begin(SD_CS, SD_MOSI, SD_MISO, SD_CLK);
+      
+      /* Set up the temperature probes */
+      configureTempResolution();
       
       /* Request the first temperatures */
       requestTemps();

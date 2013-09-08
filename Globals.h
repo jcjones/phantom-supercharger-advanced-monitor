@@ -20,6 +20,11 @@
 // OneWire Commands
 #define STARTCONVO      0x44  // Tells device to take a temperature reading and put it on the scratchpad
 #define READSCRATCH     0xBE  // Read EEPROM
+#define WRITESCRATCH    0x4E  // Write to EEPROM
+#define COPYSCRATCH     0x48  // Copy EEPROM
+
+// OneWire Configurations
+#define TEMP_12_BIT 0x7F // 12 bit
 
 // OneWire Scratchpad locations
 #define TEMP_LSB        0
@@ -31,5 +36,7 @@
 #define COUNT_REMAIN    6
 #define COUNT_PER_C     7
 #define SCRATCHPAD_CRC  8
+
+#define NOT_PARASITE  0
 
 #endif // Globals_h
