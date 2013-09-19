@@ -44,7 +44,8 @@ void DataLogging_Begin(int pin_cs, int pin_mosi, int pin_miso, int pin_clk) {
   RTC->begin();
 
   if (! RTC->isrunning()) {
-    showFatal("RTC unintialized");
+    showNotice("Clock failure!");
+    Serial.println(F("Clock was not running"));    
     return;
     // following line sets the RTC to the date & time this sketch was compiled
     // uncomment it & upload to set the time, date and start run the RTC!
@@ -65,6 +66,7 @@ void DataLogging_Begin(int pin_cs, int pin_mosi, int pin_miso, int pin_clk) {
   // see if the card is present and can be initialized:
   if (!SD.begin(pin_cs, pin_mosi, pin_miso, pin_clk)) {
     showNotice("SD Card Not Present");
+    Serial.println(F("Could not initialize SD card"));
     return;
   }
 
@@ -83,7 +85,7 @@ void DataLogging_Begin(int pin_cs, int pin_mosi, int pin_miso, int pin_clk) {
     dataFile.println(F("timeMs,voltage,motorTempC,controllerTempC"));
     dataFile.flush();
     
-    showNotice("Logging to SD card");
+//    showNotice("Logging to SD card");
     
   } else {
     showNotice("Error opening log");
@@ -92,14 +94,17 @@ void DataLogging_Begin(int pin_cs, int pin_mosi, int pin_miso, int pin_clk) {
 }
 
 
-void logData(float sensorVoltOne, float sensorTempOneC, float sensorTempTwoC) {
+void logData(float sensorVoltOne, float motorTempC, float controllerTempC) {
    dataFile.print(millis());
    dataFile.print(",");
    dataFile.print(sensorVoltOne, 2);
    dataFile.print(",");
-   dataFile.print(sensorTempOneC, 2);
+   dataFile.print(motorTempC, 2);
    dataFile.print(",");
-   dataFile.print(sensorTempTwoC, 2);
+   dataFile.print(controllerTempC, 2);
    dataFile.println();
    dataFile.flush();
+   
+//   Serial.print("Log: mototemp ");
+//   Serial.println(motorTempC, 2);
 }

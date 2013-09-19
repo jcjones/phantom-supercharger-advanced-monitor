@@ -37,6 +37,7 @@ byte motorThermometer[] = { 0x28, 0x0D, 0xDE, 0xB2, 0x04, 0x00, 0x00, 0xA0 };
 /* Used to space out periodic tasks */
 long lastLogUpdate = 0;
 long lastTempUpdate = 0;
+long stateEndTimeMs = 0;
 
 /*
 from pins_arduino.h:
@@ -69,7 +70,6 @@ float motorTempC;
 float sensorVoltOne;
 int sensorVoltOneI;
 
-boolean relayEnabled = false;
 int lastButtonState = LOW;
 
 
@@ -77,19 +77,13 @@ int lastButtonState = LOW;
 char onscreenNoticeMessage[33];
 
 #define STATE_SPLASH 0
+#define STATE_COUNTDOWN 1
 #define STATE_NOTICE 8
 #define STATE_FATAL 9
-#define STATE_NORMAL 1
+#define STATE_NORMAL 2
+#define STATE_DISABLED 3
 int displayState;
 
-/* State change function */
-void changeState(int newState) {
-  Serial.print(F("S_OLD: "));
-  Serial.print(displayState);  
-  Serial.print(F("   S_NEW: "));
-  Serial.println(newState);  
-  displayState = newState;
-}
 
 /* Set the temperature probes to high resolution */
 void configureTempResolution() {
@@ -192,10 +186,15 @@ void readVoltSensors()
 {  
   analogRead(VOLT_ONE); // Discard the first read
   sensorVoltOneI = analogRead(VOLT_ONE);
-
+  
   // fake it
 //  sensorVoltOneI = constrain((millis()/10)%1023, 440, 1023); // fake fake TODO
-  sensorVoltOneI = (int)(292.0*sin(millis()/5000.0)+732.0);
+//  sensorVoltOneI = (int)(292.0*sin(millis()/5000.0)+732.0);
+
+  Serial.print(F("Read Val: "));
+  Serial.print(sensorVoltOneI);
+  Serial.print(F("  Conv: "));
+  Serial.println(sensorVoltOne);
 
   sensorVoltOne = sensorVoltOneI * (30.0 / 1024.0);
 
@@ -216,25 +215,6 @@ boolean readButtonState() {
   return result;
 }
 
-/* Change the relay enabled state */
-void changeRelayEnabledState(boolean newState) {
-  relayEnabled = newState;
-  
-  if (relayEnabled) {
-    Serial.println(F("Relay enabled"));
-    digitalWrite(RELAY, HIGH);
-  } else {
-    Serial.println(F("Relay disabled"));
-    digitalWrite(RELAY, LOW);
-  }  
-}
-
-/* Helper Function to toggle based on the state variable */
-void toggleRelayEnabledState() {
-  changeRelayEnabledState( !relayEnabled );
-}
-
-
 /* Show an error and stop */
 void showFatal(const char* buf){
   onscreenNoticeMessage[0] = '\0';
@@ -253,100 +233,8 @@ void showNotice(const char* buf){
 }
 
 
-/* Operate the OLED display */
-void draw() {
-  switch (displayState) {
-    case STATE_FATAL:
-      u8g.setColorIndex(1);
-      u8g.setFont(u8g_font_6x10r);
-      u8g.drawFrame(0, 0, DISPLAY_WIDTH, 34);
-      u8g.drawStr( 28, 12, F("FATAL ERROR:"));
-      u8g.drawStr( 6, 24, onscreenNoticeMessage);
-      break;
-    case STATE_NOTICE:
-      u8g.setColorIndex(1);
-      u8g.setFont(u8g_font_6x10r);
-      u8g.drawFrame(0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT);
-      u8g.drawStr( 41, 12, F("Notice:"));
-      u8g.drawStr( 6, 24, onscreenNoticeMessage);
-      u8g.drawStr( 26, 61, F("Press button."));      
-      break;
-    case STATE_SPLASH:
-      u8g.setColorIndex(1);
-      u8g.setFont(u8g_font_6x10r);
-      u8g.drawStr( 27, 22, F("   PHANTOM   "));
-      u8g.drawStr( 27, 34, F("FULL-THROTTLE"));
-      u8g.drawStr( 29, 46,  F("SUPERCHARGER"));
-      break;
-    case STATE_NORMAL:
-      u8g.setColorIndex(1);
-      u8g.setFont(u8g_font_6x10r);
-      u8g.setPrintPos(2, 10);
-      u8g.print(F("MOT "));
-      u8g.print(motorTempC, 1);
-      u8g.print(F("C   CPU "));
-      u8g.print(controllerTempC, 1);
-      u8g.print(F("C"));
-      
-      if (relayEnabled) {
-      
-        if (isBoosting()) {
-          u8g.setPrintPos(40, 20);
-          u8g.print(F("Boosting"));
-        } else { 
-          u8g.setPrintPos(10, 20);     
-          u8g.print(F("Last Boost: "));
-          u8g.print(getLastBoostDurationMillis()/1000.0, 2);
-          u8g.print(F(" s"));
-        }
-        
-        for(int i=0; i<BARGRAPH_DATA_SZ; i++) {
-          int h = getBarGraphDataPointInPast(i);
-          int x = i*2;
-          int yStart = DISPLAY_HEIGHT - h;
-          u8g.drawVLine(DISPLAY_WIDTH-x, yStart, h);
-          u8g.drawVLine(DISPLAY_WIDTH-x+1, yStart, h);        
-        }
-        
-  
-        u8g.setColorIndex(0);
-        u8g.drawRBox(30, 36, 72, 28, 2);
-  
-        u8g.setColorIndex(1);
-        u8g.drawRFrame(30, 36, 72, 28, 2);      
-  
-        u8g.setFont(u8g_font_helvB24n);
-        u8g.setPrintPos(34, 63);      
-        u8g.print(sensorVoltOne, 1);
-      
-      } else { 
-        
-        u8g.setPrintPos(34, 63);
-        u8g.print(F("Disabled"));        
-      }
-      
-      break;   
-  }
-}
-
-
-void setup()   {       
-  Serial.begin(9600);
-  
-  u8g.setHardwareBackup(u8g_backup_avr_spi);
-  
-  pinMode(SD_CS, OUTPUT);
-  pinMode(OLED_CS, OUTPUT);
-  pinMode(BUTTON, INPUT);
-   
-  changeRelayEnabledState(false);  
-  changeState(STATE_SPLASH);
-
-  // Setup bar graph
-  setupBarGraph();
-}
-
-void loopNormal() {
+/* Do state updates for Normal and Disabled states */
+void loopNormalAndDisabled() {
   readVoltSensors();
     
   long time = millis();
@@ -375,6 +263,149 @@ void loopNormal() {
   updateBoostDuration();  
 }
 
+
+/* Operate the OLED display */
+void draw() {
+  switch (displayState) {
+    case STATE_FATAL:
+      u8g.setColorIndex(1);
+      u8g.setFont(u8g_font_6x10r);
+      u8g.drawFrame(0, 0, DISPLAY_WIDTH, 34);
+      u8g.drawStr( 28, 12, F("FATAL ERROR:"));
+      u8g.drawStr( 6, 24, onscreenNoticeMessage);
+      break;
+    case STATE_NOTICE:
+      u8g.setColorIndex(1);
+      u8g.setFont(u8g_font_6x10r);
+      u8g.drawFrame(0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT);
+      u8g.drawStr( 41, 12, F("Notice:"));
+      u8g.drawStr( 6, 24, onscreenNoticeMessage);
+      u8g.drawStr( 26, 61, F("Press button."));      
+      break;
+    case STATE_SPLASH:
+      u8g.setColorIndex(1);
+      u8g.setFont(u8g_font_6x10r);
+      u8g.drawStr( 27, 22, F("   PHANTOM   "));
+      u8g.drawStr( 27, 34, F("FULL-THROTTLE"));
+      u8g.drawStr( 29, 46,  F("SUPERCHARGER"));
+      break;
+    case STATE_COUNTDOWN:
+      u8g.setFont(u8g_font_6x10r);
+      u8g.drawStr( 26, 22, F("Starting in:"));
+      
+      u8g.setFont(u8g_font_helvB24n);
+      u8g.setPrintPos(40, 63);      
+      {
+        long timeLeftMillis = stateEndTimeMs - millis();
+        float timeLeftSeconds = 0.0;
+        /* Print 0.0 if the remaining millis is not positive */
+        if (timeLeftMillis > 0) {
+          timeLeftSeconds = (timeLeftMillis) / 1000.0;        
+        }
+        u8g.print(timeLeftSeconds, 1);        
+      }
+      break;
+    case STATE_NORMAL:
+      u8g.setColorIndex(1);
+      u8g.setFont(u8g_font_6x10r);
+      u8g.setPrintPos(2, 10);
+      u8g.print(F("MOT "));
+      u8g.print(motorTempC, 1);
+      u8g.print(F("C   CPU "));
+      u8g.print(controllerTempC, 1);
+      u8g.print(F("C"));
+      
+    
+      if (isBoosting()) {
+        u8g.setPrintPos(40, 20);
+        u8g.print(F("Boosting"));
+      } else { 
+        u8g.setPrintPos(10, 20);     
+        u8g.print(F("Last Boost: "));
+        u8g.print(getLastBoostDurationMillis()/1000.0, 2);
+        u8g.print(F(" s"));
+      }
+      
+      for(int i=0; i<BARGRAPH_DATA_SZ; i++) {
+        int h = getBarGraphDataPointInPast(i);
+        int x = i*2;
+        int yStart = DISPLAY_HEIGHT - h;
+        u8g.drawVLine(DISPLAY_WIDTH-x, yStart, h);
+        u8g.drawVLine(DISPLAY_WIDTH-x+1, yStart, h);        
+      }
+      
+
+      u8g.setColorIndex(0);
+      u8g.drawRBox(30, 36, 72, 28, 2);
+
+      u8g.setColorIndex(1);
+      u8g.drawRFrame(30, 36, 72, 28, 2);      
+
+      u8g.setFont(u8g_font_helvB24n);
+      u8g.setPrintPos(34, 63);      
+      u8g.print(sensorVoltOne, 1);
+//        u8g.print(" ");
+//        u8g.print(sensorVoltOneI);
+            
+      break;   
+case STATE_DISABLED:
+      u8g.setColorIndex(1);
+      u8g.setFont(u8g_font_6x10r);
+      u8g.setPrintPos(2, 10);
+      u8g.print(F("MOT "));
+      u8g.print(motorTempC, 1);
+      u8g.print(F("C   CPU "));
+      u8g.print(controllerTempC, 1);
+      u8g.print(F("C"));
+     
+      u8g.setColorIndex(1);      
+      u8g.drawStr( 20, 61, F("Press to Enable"));      
+      break;         
+  }
+}
+
+
+void setup()   {       
+  Serial.begin(9600);
+  
+  u8g.setHardwareBackup(u8g_backup_avr_spi);
+  
+  pinMode(SD_CS, OUTPUT);
+  pinMode(OLED_CS, OUTPUT);
+  pinMode(RELAY, OUTPUT);
+  pinMode(BUTTON, INPUT);
+   
+  changeState(STATE_SPLASH);
+
+  // Setup bar graph
+  setupBarGraph();
+}
+
+
+/* State change function */
+void changeState(int newState) {
+//  Serial.print(F("S_OLD: "));
+//  Serial.print(displayState);  
+//  Serial.print(F("   S_NEW: "));
+//  Serial.println(newState);  
+  displayState = newState;
+  
+  switch (displayState) {
+    case STATE_NORMAL:
+      Serial.println(F("Relay enabled"));
+      digitalWrite(RELAY, HIGH);   
+      break;    
+    case STATE_DISABLED:
+      Serial.println(F("Relay disabled"));
+      digitalWrite(RELAY, LOW);    
+      break;
+    case STATE_COUNTDOWN:
+      stateEndTimeMs = millis() + COUNTDOWN_TIME_MS;
+      break;
+  }
+}
+
+
 void loop() {
   
   /* Draw */
@@ -389,10 +420,7 @@ void loop() {
  
   /* State updates */
   switch(displayState){
-    case STATE_SPLASH:
-      /* Move to Normal. */
-      changeState(STATE_NORMAL);
-      
+    case STATE_SPLASH:    
       /* Initialize the data logger */
       DataLogging_Begin(SD_CS, SD_MOSI, SD_MISO, SD_CLK);
       
@@ -405,8 +433,8 @@ void loop() {
       /* Remain in splash for 2 seconds */
       delay(2000);
       
-      /* Enable relay */
-      changeRelayEnabledState(true);
+      /* Move to Countdown. */
+      changeState(STATE_COUNTDOWN);     
       
       break;
     case STATE_FATAL:
@@ -421,12 +449,26 @@ void loop() {
       }
       
       break;
+    case STATE_COUNTDOWN:
+      if (stateEndTimeMs < millis() || buttonPressed) {
+        /* Return to Normal. */
+        changeState(STATE_NORMAL);
+      }
+            
+      break;
     case STATE_NORMAL:
       if (buttonPressed) {
-        toggleRelayEnabledState();
+        changeState(STATE_DISABLED);        
       }
       
-      loopNormal();    
+      loopNormalAndDisabled();
+      break;
+    case STATE_DISABLED:
+      if (buttonPressed) {
+        changeState(STATE_NORMAL);        
+      }
+    
+      loopNormalAndDisabled();
       break;
    }
   
