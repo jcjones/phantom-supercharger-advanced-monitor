@@ -1,0 +1,3 @@
+[submodule "dependencies/RTClib"]
+	path = dependencies/RTClib
+	url = https://github.com/adafruit/RTClib.git

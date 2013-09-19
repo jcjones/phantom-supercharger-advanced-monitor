@@ -1,5 +1,4 @@
 #include <OneWire.h>
-#include <MemoryFree.h>
 #include "Globals.h"
 #include "U8glib.h"
 
@@ -190,14 +189,16 @@ void readVoltSensors()
   // fake it
 //  sensorVoltOneI = constrain((millis()/10)%1023, 440, 1023); // fake fake TODO
 //  sensorVoltOneI = (int)(292.0*sin(millis()/5000.0)+732.0);
+ 
+  sensorVoltOne = sensorVoltOneI * (29.73 / 1024.0);
 
   Serial.print(F("Read Val: "));
   Serial.print(sensorVoltOneI);
   Serial.print(F("  Conv: "));
-  Serial.println(sensorVoltOne);
-
-  sensorVoltOne = sensorVoltOneI * (30.0 / 1024.0);
-
+  Serial.print(sensorVoltOne);
+  Serial.print(F("  Int: "));
+  Serial.println(map(sensorVoltOneI, 0, 1024, 0, 298));
+  
   addBarGraphDataPoint(sensorVoltOneI);
 }
 
@@ -252,10 +253,6 @@ void loopNormalAndDisabled() {
     
     /* Write to disk */
     logData(sensorVoltOne, motorTempC, controllerTempC);
-
-    /* Debugging */
-    Serial.print(F("Free RAM ="));
-    Serial.println(freeMemory());
 
   }
 
