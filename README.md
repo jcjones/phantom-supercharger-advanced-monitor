@@ -15,6 +15,7 @@ Bill of Materials
 * 1x 1 M Ohm resistor
 * 1x 200 k Ohm resistor
 * 3x 1k ohm resistors
+* 1x 440 ohm resistor
 * 1x SD card for logging
 * Wire, various colors
 * Perfboard / Protoboard
