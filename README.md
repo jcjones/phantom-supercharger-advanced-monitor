@@ -25,16 +25,29 @@ Bill of Materials
 
 Circuit Design
 ------------------------
-Diagrams and original files in the design/ folder
+![Breadboard Design](./design/Controller Monitor rev3_bb.png "Breadboard Design")
+Diagram exports and original files are in the [./design/]() folder. 
+
+### Errata
+There is also an [errata list](./design/Errata.md) of things not currently included in the diagrams.
 
 Compiling
 ------------------------
 Use the Arduino IDE; you must install the dependencies as libraries within dependencies/ . That includes installing u8glib, which must be downloaded and installed. See [./dependencies/README.md]()
 
-To install the submodules:
-> git submodule init
-> git submodule update
+To download the submodules:
+```
+ git submodule init
+ git submodule update
+```
+
+See [./dependencies/README.md]() for instructions on loading them into the Arduino IDE; in particular the U8glib library needs special care.
 
 Usage
 ------------------------
 You must ensure the Real-time Clock is set before logging can function; load, compile, install and run the *ds1138* sketch example once to set the clock. Then you should re-compile and load the Monitor software immediately, as the ds1138 sketch will set the RTC clock to its' compile time each time it starts.
+
+
+Next Steps
+------------------------
+After proving the circuit in real-world testing, the next revision is planned to be rendered to PCB form for added compactness. Given the lack of Fritzing-based fabrication facilities, rev 5 of the circuit design will be based on EagleCAD.
