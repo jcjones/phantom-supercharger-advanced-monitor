@@ -31,6 +31,10 @@ Compiling
 ------------------------
 Use the Arduino IDE; you must install the dependencies as libraries within dependencies/ . That includes installing u8glib, which must be downloaded and installed. See [./dependencies/README.md]()
 
+To install the submodules:
+> git submodule init
+> git submodule update
+
 Usage
 ------------------------
 You must ensure the Real-time Clock is set before logging can function; load, compile, install and run the *ds1138* sketch example once to set the clock. Then you should re-compile and load the Monitor software immediately, as the ds1138 sketch will set the RTC clock to its' compile time each time it starts.

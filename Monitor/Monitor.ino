@@ -66,7 +66,6 @@ U8GLIB_SSD1306_128X64 u8g(OLED_CLK, OLED_MOSI, OLED_CS, OLED_DC, OLED_RESET); //
 
 float controllerTempC;
 float motorTempC;
-float sensorVoltOne;
 int sensorVoltOneI;
 
 int lastButtonState = LOW;
@@ -190,14 +189,17 @@ void readVoltSensors()
 //  sensorVoltOneI = constrain((millis()/10)%1023, 440, 1023); // fake fake TODO
 //  sensorVoltOneI = (int)(292.0*sin(millis()/5000.0)+732.0);
  
-  sensorVoltOne = sensorVoltOneI * (29.73 / 1024.0);
+//  sensorVoltOne = sensorVoltOneI * (29.73 / 1024.0);
 
-  Serial.print(F("Read Val: "));
-  Serial.print(sensorVoltOneI);
-  Serial.print(F("  Conv: "));
-  Serial.print(sensorVoltOne);
-  Serial.print(F("  Int: "));
-  Serial.println(map(sensorVoltOneI, 0, 1024, 0, 298));
+//  Serial.print(F("Read Val: "));
+//  Serial.print(sensorVoltOneI);
+//  Serial.print(F("  Conv: "));
+//  Serial.print(sensorVoltOne);
+  
+  sensorVoltOneI = map(sensorVoltOneI, 0, 1024, 0, 299);
+ 
+//  Serial.print(F("  Int: "));
+//  Serial.println(sensorVoltOneI);
   
   addBarGraphDataPoint(sensorVoltOneI);
 }
@@ -252,7 +254,7 @@ void loopNormalAndDisabled() {
     lastLogUpdate = time;
     
     /* Write to disk */
-    logData(sensorVoltOne, motorTempC, controllerTempC);
+    logData(sensorVoltOneI, motorTempC, controllerTempC);
 
   }
 
@@ -339,11 +341,11 @@ void draw() {
       u8g.drawRFrame(30, 36, 72, 28, 2);      
 
       u8g.setFont(u8g_font_helvB24n);
-      u8g.setPrintPos(34, 63);      
-      u8g.print(sensorVoltOne, 1);
-//        u8g.print(" ");
-//        u8g.print(sensorVoltOneI);
-            
+      u8g.setPrintPos(34, 63);
+      u8g.print(sensorVoltOneI/10);
+      u8g.print(".");
+      u8g.print(sensorVoltOneI - (sensorVoltOneI/10*10)); 
+      
       break;   
 case STATE_DISABLED:
       u8g.setColorIndex(1);

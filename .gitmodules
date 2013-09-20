@@ -1,3 +1,12 @@
 [submodule "dependencies/RTClib"]
 	path = dependencies/RTClib
 	url = https://github.com/adafruit/RTClib.git
+[submodule "dependencies/u8glib"]
+	path = dependencies/u8glib
+	url = https://github.com/pabigot/u8glib.git
+[submodule "dependencies/OneWire"]
+	path = dependencies/OneWire
+	url = https://github.com/ntruchsess/arduino-OneWire.git
+[submodule "dependencies/SD"]
+	path = dependencies/SD
+	url = https://github.com/adafruit/SD.git

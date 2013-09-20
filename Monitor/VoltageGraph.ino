@@ -12,13 +12,11 @@ void addBarGraphDataPoint(int value) {
   barGraphIndex += 1;
   if (barGraphIndex >= BARGRAPH_DATA_SZ){
     barGraphIndex = 0;
-    Serial.print(F("Bazinga::"));
-    Serial.println(value);
   }
 
   // From 16 V to 28.5 V, scaled
-  value = constrain(value, 440, 1023);  
-  barGraphData[barGraphIndex] = map(value, 440, 1023, 0, GRAPH_HEIGHT);
+  value = constrain(value, 166, 285);
+  barGraphData[barGraphIndex] = map(value, 160, 285, 0, GRAPH_HEIGHT);
 }
 
 int getBarGraphDataPointInPast(int cycleOffset) {

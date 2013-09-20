@@ -10,7 +10,7 @@ int getLastBoostDurationMillis() {
 }
 
 inline float getdVdT() {
-  return (float)(getBarGraphDataPointInPast(0) - getBarGraphDataPointInPast(4)) / (CYCLE_DELAY * 5.0); // 5 ticks total
+  return (float)(getBarGraphDataPointInPast(0) - getBarGraphDataPointInPast(5)) / (CYCLE_DELAY * 6.0); // 5 ticks total
 }
 
 int updateBoostDuration() {

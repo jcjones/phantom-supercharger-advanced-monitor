@@ -94,10 +94,12 @@ void DataLogging_Begin(int pin_cs, int pin_mosi, int pin_miso, int pin_clk) {
 }
 
 
-void logData(float sensorVoltOne, float motorTempC, float controllerTempC) {
+void logData(int sensorVoltOneI, float motorTempC, float controllerTempC) {
    dataFile.print(millis());
    dataFile.print(",");
-   dataFile.print(sensorVoltOne, 2);
+   dataFile.print(sensorVoltOneI/10);
+   dataFile.print(".");
+   dataFile.print(sensorVoltOneI - (sensorVoltOneI/10*10)); 
    dataFile.print(",");
    dataFile.print(motorTempC, 2);
    dataFile.print(",");
